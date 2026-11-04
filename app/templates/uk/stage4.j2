@@ -1,0 +1,13 @@
+SUBJECT: Останнє попередження: рахунок {{ invoice_number }} — {{ days_overdue }} дн. прострочення
+{{ client_name }}, вітаємо!
+
+Рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
+не оплачений {{ days_overdue }} дн. (термін оплати: {{ due_date }}).
+Це останнє попередження перед передачею справи на стягнення.
+{% if late_fee_line %}
+{{ late_fee_line }}
+{% endif %}
+Будь ласка, оплатіть протягом 5 днів.
+
+З повагою,
+{{ company_name }}

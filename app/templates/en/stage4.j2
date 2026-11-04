@@ -1,0 +1,13 @@
+SUBJECT: Final notice: invoice {{ invoice_number }} — {{ days_overdue }} days overdue
+Hi {{ client_name }}!
+
+Invoice {{ invoice_number }} for {{ amount }} {{ currency }}
+has been unpaid for {{ days_overdue }} days (payment due: {{ due_date }}).
+This is a final notice before the matter is handed to collections.
+{% if late_fee_line %}
+{{ late_fee_line }}
+{% endif %}
+Please pay within 5 days.
+
+Best regards,
+{{ company_name }}

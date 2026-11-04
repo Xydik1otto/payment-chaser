@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<title>Payment Chaser — вибивання прострочених оплат</title>
+<style>
+:root { --accent:#dc2626; --ok:#16a34a; --bg:#fafaf9; --line:#e7e5e4; }
+* { box-sizing:border-box; }
+body { font-family:system-ui,Segoe UI,Arial,sans-serif; margin:0; background:var(--bg); color:#1c1917; }
+header { background:#fff; border-bottom:1px solid var(--line); padding:12px 24px; display:flex; gap:16px; align-items:baseline; }
+header h1 { font-size:18px; margin:0; color:var(--accent); }
+main { max-width:1100px; margin:24px auto; padding:0 16px; }
+.card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px 20px; margin-bottom:20px; }
+.stats { display:flex; gap:16px; flex-wrap:wrap; }
+.stat { flex:1; min-width:140px; border:1px solid var(--line); border-radius:8px; padding:12px; text-align:center; }
+.stat .num { font-size:28px; font-weight:700; }
+.stat .lbl { color:#78716c; font-size:12px; }
+button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:8px 14px; cursor:pointer; }
+button.secondary { background:#78716c; }
+button.ok { background:var(--ok); }
+input, select { padding:6px 8px; border:1px solid var(--line); border-radius:6px; }
+table { width:100%; border-collapse:collapse; font-size:14px; }
+th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+tr.overdue td { color:var(--accent); }
+.muted { color:#78716c; font-size:12px; }
+pre { white-space:pre-wrap; background:#f5f5f4; padding:10px; border-radius:6px; font-size:12px; }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+<header><h1>Payment Chaser</h1><span class="muted">нагадування пишуться самі — ви тільки тиснете Copy</span></header>
+<main>
+  <div class="card">
+    <div class="stats" id="stats"></div>
+    <div style="margin-top:12px">
+      <button onclick="runEngine()">▶ Запустити движок нагадувань</button>
+      <span id="smtpNote" class="muted"></span>
+    </div>
+    <div id="runResult"></div>
+  </div>
+
+  <div class="card">
+    <h3>Новий клієнт</h3>
+    <input id="cName" placeholder="Ім'я / компанія"> <input id="cEmail" placeholder="email">
+    <select id="cLang"><option value="uk">uk</option><option value="en">en</option></select>
+    <button onclick="addClient()">Додати</button>
+  </div>
+
+  <div class="card">
+    <h3>Новий рахунок</h3>
+    <input id="iNum" placeholder="Номер, напр. INV-001" style="width:140px">
+    <select id="iClient"></select>
+    <input id="iAmount" type="number" placeholder="Сума" style="width:110px">
+    <input id="iDue" type="date"> <button onclick="addInvoice()">Додати</button>
+  </div>
+
+  <div class="card">
+    <h3>Рахунки</h3>
+    <select id="fStatus" onchange="loadInvoices()"><option value="">— всі —</option><option>draft</option><option>sent</option><option>overdue</option><option>paid</option></select>
+    <table id="invTable"><thead><tr><th>Номер</th><th>Клієнт</th><th>Сума</th><th>Термін</th><th>Статус</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>Черга листів (outbox)</h3>
+    <div id="outboxBox" class="muted">порожньо</div>
+  </div>
+</main>
+<script>
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json' } });
+  if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+  return r.json();
+}
+
+async function loadDashboard() {
+  const d = await api('/api/dashboard');
+  const b = d.buckets;
+  document.getElementById('stats').innerHTML =
+    `<div class="stat"><div class="num">${d.overdue_count}</div><div class="lbl">прострочено</div></div>` +
+    `<div class="stat"><div class="num">${d.total_overdue_amount.toFixed(2)}</div><div class="lbl">загальна сума</div></div>` +
+    Object.entries(b).map(([k, v]) => `<div class="stat"><div class="num">${v.count}</div><div class="lbl">${k} дн. (${v.amount.toFixed(0)})</div></div>`).join('');
+  document.getElementById('smtpNote').textContent = d.smtp_configured
+    ? 'SMTP налаштовано — листи відправляються автоматично'
+    : 'SMTP не налаштовано — листи чекають у outbox, копіюйте вручну';
+}
+
+async function runEngine() {
+  const d = await api('/api/engine/run', { method: 'POST' });
+  document.getElementById('runResult').innerHTML =
+    `<pre>${d.letters_sent} лист(ів) сьогодні:\n${d.letters.map(l => `${l.invoice_number} — stage ${l.stage} (${l.stage_name}) → ${l.channel}`).join('\n') || '—'}</pre>`;
+  await Promise.all([loadDashboard(), loadInvoices(), loadOutbox()]);
+}
+
+async function addClient() {
+  await api('/api/clients', { method: 'POST', body: JSON.stringify({ name: cName.value, email: cEmail.value, language: cLang.value }) });
+  cName.value = cEmail.value = ''; await loadClients();
+}
+
+async function loadClients() {
+  const clients = await api('/api/clients');
+  iClient.innerHTML = clients.map(c => `<option value="${c.id}">${c.name} (${c.language})</option>`).join('');
+}
+
+async function addInvoice() {
+  const issued = new Date().toISOString().slice(0, 10);
+  await api('/api/invoices', { method: 'POST', body: JSON.stringify({ number: iNum.value, client_id: +iClient.value, amount: +iAmount.value, issued_date: issued, due_date: iDue.value }) });
+  iNum.value = iAmount.value = ''; await loadInvoices(); await loadDashboard();
+}
+
+async function loadInvoices() {
+  const p = fStatus.value ? '?status=' + fStatus.value : '';
+  const rows = await api('/api/invoices' + p);
+  const tb = document.querySelector('#invTable tbody'); tb.innerHTML = '';
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    if (r.status === 'overdue') tr.className = 'overdue';
+    tr.innerHTML = `<td>${r.number}</td><td>${r.client_name}</td><td>${r.amount.toFixed(2)} ${r.currency}</td><td>${r.due_date}</td>` +
+      `<td>${r.status}</td><td>${r.status !== 'paid' ? `<button class="ok" onclick="markPaid(${r.id})">Оплачено</button>` : ''}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function markPaid(id) {
+  await api('/api/invoices/' + id, { method: 'PATCH', body: JSON.stringify({ status: 'paid' }) });
+  await Promise.all([loadInvoices(), loadDashboard(), loadOutbox()]);
+}
+
+async function loadOutbox() {
+  const rows = await api('/api/outbox');
+  const box = document.getElementById('outboxBox');
+  if (!rows.length) { box.textContent = 'порожньо'; return; }
+  box.innerHTML = rows.map(o =>
+    `<div style="border-top:1px solid var(--line);padding:8px 0">
+       <b>${o.subject}</b> → ${o.to_email} ${o.copied_at ? '<span class="muted">(скопійовано)</span>' : `<button class="secondary" onclick="copyMail(${o.id}, this)">Copy</button>`}
+       <pre id="mail-${o.id}" class="hidden">${o.body}</pre>
+     </div>`).join('');
+}
+
+async function copyMail(id, btn) {
+  const o = (await api('/api/outbox')).find(x => x.id === id);
+  await navigator.clipboard.writeText(`Subject: ${o.subject}\n\n${o.body}`).catch(() => {
+    document.getElementById('mail-' + id).classList.remove('hidden');
+  });
+  btn.textContent = '✓ скопійовано'; btn.disabled = true;
+  await api(`/api/outbox/${id}/mark-copied`, { method: 'POST' });
+}
+
+loadDashboard(); loadClients(); loadInvoices(); loadOutbox();
+</script>
+</body>
+</html>
