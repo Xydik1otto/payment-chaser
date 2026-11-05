@@ -114,6 +114,10 @@ _EXTRA_INVOICE_COLUMNS = {
     "amount_paid": "REAL NOT NULL DEFAULT 0",         # partial payments (v0.4.0)
 }
 
+_EXTRA_CLIENT_COLUMNS = {
+    "portal_token": "TEXT",                           # read-only client portal (v1.1)
+}
+
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Add columns introduced in later versions to existing databases."""
@@ -121,6 +125,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     for col, ddl in _EXTRA_INVOICE_COLUMNS.items():
         if col not in existing:
             conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} {ddl}")
+    existing_c = {r["name"] for r in conn.execute("PRAGMA table_info(clients)")}
+    for col, ddl in _EXTRA_CLIENT_COLUMNS.items():
+        if col not in existing_c:
+            conn.execute(f"ALTER TABLE clients ADD COLUMN {col} {ddl}")
     _migrate_partial_check(conn)
     _migrate_client_terms(conn)
 

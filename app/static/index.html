@@ -224,6 +224,7 @@ async function loadInvoices() {
         ? `<button class="secondary" onclick="setPause(${r.id}, false)">${t('resume')}</button>`
         : `<button class="secondary" onclick="setPause(${r.id}, true)">${t('pause')}</button>`) : ''}` +
       `<a href="/api/invoices/${r.id}/preview" target="_blank">${t('preview')}</a> ` +
+      `<a href="#" onclick="openPortal(${r.client_id});return false">${t('portal')}</a> ` +
       `<a href="/api/invoices/${r.id}/pdf?template=${pdfTpl.value}" target="_blank">PDF</a> ` +
       `<button class="secondary" onclick="deleteInvoice(${r.id})" aria-label="${t('delete')} ${r.number}">🗑</button></td>`;
     tb.appendChild(tr);
@@ -241,6 +242,11 @@ async function addPayment(id) {
   if (!v || !(parseFloat(v) > 0)) return;
   await api(`/api/invoices/${id}/payment`, { method: 'POST', body: JSON.stringify({ amount: parseFloat(v) }) });
   await Promise.all([loadInvoices(), loadDashboard()]);
+}
+
+async function openPortal(clientId) {
+  const d = await api(`/api/clients/${clientId}/portal-link`, { method: 'POST' });
+  window.open(d.url, '_blank');
 }
 
 async function loadOutbox() {

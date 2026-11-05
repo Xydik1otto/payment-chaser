@@ -12,6 +12,7 @@ Routes:
   History  GET  /api/reminders
 """
 import os
+import secrets
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 
@@ -578,6 +579,80 @@ def recurring_run(body: RecurringRunIn | None = None, conn=Conn):
     created = recurring.create_due(conn, today)
     return {"run_date": today.isoformat(), "created": created,
             "created_count": len(created)}
+
+
+# ---------------------------------------------------------------- client portal
+
+
+@app.post("/api/clients/{client_id}/portal-link")
+def portal_link(client_id: int, conn=Conn):
+    """Issue (once) and return the client's read-only portal token.
+    The same client always gets the same link — safe to re-share."""
+    row = conn.execute(
+        "SELECT id, portal_token FROM clients WHERE id = ?", (client_id,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Client not found")
+    token = row["portal_token"]
+    if not token:
+        token = secrets.token_urlsafe(16)
+        conn.execute("UPDATE clients SET portal_token = ? WHERE id = ?", (token, client_id))
+    return {"token": token, "url": f"/portal/{token}"}
+
+
+def _portal_client(conn, token: str) -> dict:
+    row = conn.execute(
+        "SELECT * FROM clients WHERE portal_token = ?", (token,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Unknown portal link")
+    return dict(row)
+
+
+@app.get("/api/portal/{token}")
+def portal_api(token: str, conn=Conn):
+    """Read-only JSON for the client: their own invoices and payment status.
+    Only GETs exist under /portal — nothing here can change data."""
+    c = _portal_client(conn, token)
+    invoices = [dict(r) for r in conn.execute(
+        "SELECT id, number, amount, currency, issued_date, due_date, "
+        "amount_paid, status FROM invoices WHERE client_id = ? ORDER BY due_date DESC",
+        (c["id"],))]
+    for inv in invoices:
+        inv["outstanding"] = db.outstanding(inv)
+    return {"client_name": c["name"], "invoices": invoices}
+
+
+@app.get("/portal/{token}", response_class=HTMLResponse)
+def portal_page(token: str, conn=Conn):
+    """Read-only status page the client can open from a shared link:
+    invoice numbers, amounts, statuses, outstanding balances. No actions."""
+    c = _portal_client(conn, token)
+    invoices = conn.execute(
+        "SELECT number, amount, currency, issued_date, due_date, amount_paid, status "
+        "FROM invoices WHERE client_id = ? ORDER BY due_date DESC", (c["id"],)
+    ).fetchall()
+    import html as html_mod
+    rows = "".join(
+        f"<tr><td>{html_mod.escape(r['number'])}</td>"
+        f"<td>{r['amount']:.2f} {html_mod.escape(r['currency'])}</td>"
+        f"<td>{r['due_date']}</td><td><b>{html_mod.escape(r['status'])}</b></td>"
+        f"<td>{db.outstanding(dict(r)):.2f} {html_mod.escape(r['currency'])}</td></tr>"
+        for r in invoices)
+    if not rows:
+        rows = "<tr><td colspan=\"5\" class=\"muted\">—</td></tr>"
+    name = html_mod.escape(c["name"])
+    return f"""<!DOCTYPE html><html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment Chaser — {name}</title>
+<style>body{{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 16px}}
+table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #ddd;padding:8px;text-align:left}}
+.muted{{color:#78716c;font-size:13px}}</style></head><body>
+<h1>{name}</h1>
+<p class="muted">Сторінка лише для перегляду — статуси ваших рахунків та залишки до оплати.</p>
+<table><tr><th>Рахунок</th><th>Сума</th><th>Термін оплати</th><th>Статус</th><th>Залишок</th></tr>
+{rows}</table>
+</body></html>"""
 
 
 # ---------------------------------------------------------------- engine
