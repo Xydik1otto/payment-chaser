@@ -6,6 +6,11 @@ Hi {{ client_name }}!
 
 Invoice {{ invoice_number }} for {{ amount }} {{ currency }}
 remains unpaid {{ days_overdue }} days past its due date ({{ due_date }}).
+{% if items %}
+Invoice line items:
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% endfor %}
+{% endif %}
 
 Please settle the invoice immediately or provide a payment plan
 within 3 business days.

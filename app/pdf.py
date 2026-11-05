@@ -61,19 +61,37 @@ def render_pdf(invoice: dict, client: dict, seller: dict | None = None) -> bytes
         y -= 5 * mm
         c.drawString(x, y, client["email"])
 
-    # items table: one line-item row + total (invoice-level amount for alpha)
+    # items table: one row per line item (item, qty, price), or a single
+    # fallback row when the invoice has no line items
     y -= 12 * mm
     c.setFont("Helvetica-Bold", 11)
     c.drawString(x, y, "Description")
     c.drawRightString(w - x, y, "Amount")
+    qty_x, price_x = w - x - 45 * mm, w - x - 22 * mm
+    c.drawRightString(price_x, y, "Price")
+    c.drawRightString(qty_x, y, "Qty")
     y -= 2 * mm
     c.line(x, y, w - x, y)
     y -= 7 * mm
     c.setFont("Helvetica", 11)
-    c.drawString(x, y, f"Services per invoice {invoice['number']}")
-    c.drawRightString(w - x, y, f"{invoice['amount']:.2f} {invoice['currency']}")
+    items = invoice.get("items") or []
+    if items:
+        for it in items:
+            if y < 40 * mm:  # simple pagination guard
+                c.showPage()
+                y = h - 25 * mm
+                c.setFont("Helvetica", 11)
+            c.drawString(x, y, it["item"])
+            c.drawRightString(qty_x, y, f"{it['qty']:g}")
+            c.drawRightString(price_x, y, f"{it['price']:.2f}")
+            c.drawRightString(w - x, y, f"{it['qty'] * it['price']:.2f}")
+            y -= 6 * mm
+    else:
+        c.drawString(x, y, f"Services per invoice {invoice['number']}")
+        c.drawRightString(w - x, y, f"{invoice['amount']:.2f} {invoice['currency']}")
+        y -= 6 * mm
 
-    y -= 10 * mm
+    y -= 6 * mm
     c.setFont("Helvetica-Bold", 13)
     c.drawString(x, y, "Total")
     c.drawRightString(w - x, y, f"{invoice['amount']:.2f} {invoice['currency']}")

@@ -84,13 +84,20 @@ def list_clients(conn=Conn):
 # ---------------------------------------------------------------- invoices
 
 
+class ItemIn(BaseModel):
+    item: str
+    qty: float = 1.0
+    price: float
+
+
 class InvoiceIn(BaseModel):
     number: str
     client_id: int
-    amount: float
+    amount: float | None = None  # computed from items when items are given
     currency: str = "UAH"
     issued_date: str
     due_date: str
+    items: list[ItemIn] = []
 
 
 @app.post("/api/invoices")
@@ -102,18 +109,34 @@ def create_invoice(body: InvoiceIn, conn=Conn):
         raise HTTPException(422, "dates must be ISO format YYYY-MM-DD")
     if conn.execute("SELECT 1 FROM clients WHERE id = ?", (body.client_id,)).fetchone() is None:
         raise HTTPException(404, "Client not found")
+    items = [it.model_dump() for it in body.items]
+    for it in items:
+        if not it["item"].strip():
+            raise HTTPException(422, "item name must not be empty")
+        if it["qty"] <= 0:
+            raise HTTPException(422, "qty must be > 0")
+    amount = db.items_total(items) if items else body.amount
+    if amount is None:
+        raise HTTPException(422, "amount is required when no items are given")
+    amount = round(amount, 2)
     try:
         cur = conn.execute(
             "INSERT INTO invoices (number, client_id, amount, currency, issued_date, due_date, status, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)",
-            (body.number, body.client_id, body.amount, body.currency,
+            (body.number, body.client_id, amount, body.currency,
              body.issued_date, body.due_date, db.now_iso()),
         )
     except Exception as exc:
         if "UNIQUE" in str(exc):
             raise HTTPException(409, f"Invoice number {body.number!r} already exists")
         raise
-    return {"id": cur.lastrowid, **body.model_dump(), "status": "draft"}
+    invoice_id = cur.lastrowid
+    if items:
+        db.add_items(conn, invoice_id, items)
+    return {"id": invoice_id, "number": body.number, "client_id": body.client_id,
+            "amount": amount, "currency": body.currency, "issued_date": body.issued_date,
+            "due_date": body.due_date, "status": "draft",
+            "items": [{**it, "total": round(it["qty"] * it["price"], 2)} for it in items]}
 
 
 @app.get("/api/invoices")
@@ -124,7 +147,24 @@ def list_invoices(status: str | None = None, conn=Conn):
     if status:
         sql += " WHERE i.status = ?"
         params.append(status)
-    return [dict(r) for r in conn.execute(sql + " ORDER BY i.due_date", params)]
+    rows = [dict(r) for r in conn.execute(sql + " ORDER BY i.due_date", params)]
+    for row in rows:
+        row["items"] = db.get_items(conn, row["id"])
+    return rows
+
+
+@app.get("/api/invoices/{invoice_id}")
+def invoice_detail(invoice_id: int, conn=Conn):
+    row = conn.execute(
+        "SELECT i.*, c.name AS client_name, c.email AS client_email, c.language "
+        "FROM invoices i JOIN clients c ON c.id = i.client_id WHERE i.id = ?",
+        (invoice_id,),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Invoice not found")
+    detail = dict(row)
+    detail["items"] = db.get_items(conn, invoice_id)
+    return detail
 
 
 class InvoicePatch(BaseModel):

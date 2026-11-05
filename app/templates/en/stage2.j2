@@ -6,6 +6,11 @@ Hi {{ client_name }}!
 
 Invoice {{ invoice_number }} for {{ amount }} {{ currency }}
 is now {{ days_overdue }} days overdue (payment due: {{ due_date }}).
+{% if items %}
+Invoice line items:
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% endfor %}
+{% endif %}
 
 Please arrange payment at your earliest convenience, or let us know
 if you have any questions about the invoice.

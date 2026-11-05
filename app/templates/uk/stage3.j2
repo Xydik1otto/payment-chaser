@@ -6,6 +6,11 @@ SUBJECT: ТЕРМІНОВО: рахунок {{ invoice_number }} простро�
 
 Рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
 залишається неоплаченим вже {{ days_overdue }} дн. (термін оплати: {{ due_date }}).
+{% if items %}
+Позиції рахунку:
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% endfor %}
+{% endif %}
 
 Просимо негайно погасити рахунок або надати план оплати протягом 3 робочих днів.
 

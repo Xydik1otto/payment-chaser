@@ -6,6 +6,11 @@ Hi {{ client_name }}!
 
 Invoice {{ invoice_number }} for {{ amount }} {{ currency }}
 has been unpaid for {{ days_overdue }} days (payment due: {{ due_date }}).
+{% if items %}
+Invoice line items:
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% endfor %}
+{% endif %}
 This is a final notice before the matter is handed to collections.
 {% if late_fee_line %}
 {{ late_fee_line }}

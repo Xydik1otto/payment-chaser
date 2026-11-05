@@ -30,6 +30,15 @@ CREATE TABLE IF NOT EXISTS invoices (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS invoice_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    item TEXT NOT NULL,
+    qty REAL NOT NULL DEFAULT 1,
+    price REAL NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     invoice_id INTEGER NOT NULL REFERENCES invoices(id),
@@ -98,6 +107,29 @@ def _migrate(conn: sqlite3.Connection) -> None:
     for col, ddl in _EXTRA_INVOICE_COLUMNS.items():
         if col not in existing:
             conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} {ddl}")
+
+
+# ---------------------------------------------------------------- line items
+
+def get_items(conn, invoice_id: int) -> list[dict]:
+    """Line items of an invoice, ordered by position (v0.4.0)."""
+    return [dict(r) for r in conn.execute(
+        "SELECT item, qty, price FROM invoice_items "
+        "WHERE invoice_id = ? ORDER BY position, id", (invoice_id,)
+    )]
+
+
+def items_total(items: list[dict]) -> float:
+    return round(sum(i["qty"] * i["price"] for i in items), 2)
+
+
+def add_items(conn, invoice_id: int, items: list[dict]) -> None:
+    for pos, it in enumerate(items):
+        conn.execute(
+            "INSERT INTO invoice_items (invoice_id, item, qty, price, position) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (invoice_id, it["item"], float(it["qty"]), float(it["price"]), pos),
+        )
 
 
 # ---------------------------------------------------------------- settings

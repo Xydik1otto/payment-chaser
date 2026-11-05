@@ -6,6 +6,11 @@ SUBJECT: Нагадування: рахунок {{ invoice_number }} на {{ amo
 
 Нагадуємо, що рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
 був виставлений з терміном оплати {{ due_date }}.
+{% if items %}
+Позиції рахунку:
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% endfor %}
+{% endif %}
 
 Якщо оплата вже здійснена — проігноруйте цей лист, дякуємо!
 

@@ -6,6 +6,11 @@ SUBJECT: Рахунок {{ invoice_number }} — прострочено на {{ 
 
 Рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
 прострочено на {{ days_overdue }} дн. (термін оплати: {{ due_date }}).
+{% if items %}
+Позиції рахунку:
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% endfor %}
+{% endif %}
 
 Будь ласка, здійсніть оплату найближчим часом або повідомте нам,
 якщо виникли питання з рахунком.

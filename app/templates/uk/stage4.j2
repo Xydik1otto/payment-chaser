@@ -6,6 +6,11 @@ SUBJECT: Останнє попередження: рахунок {{ invoice_numb
 
 Рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
 не оплачений {{ days_overdue }} дн. (термін оплати: {{ due_date }}).
+{% if items %}
+Позиції рахунку:
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% endfor %}
+{% endif %}
 Це останнє попередження перед передачею справи на стягнення.
 {% if late_fee_line %}
 {{ late_fee_line }}
