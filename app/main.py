@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response, HTMLResponse
 from pydantic import BaseModel
 
-from . import db, mailer, pdf, reminder_engine, scheduler, stats, summary, fx, report
+from . import db, demo, mailer, pdf, reminder_engine, scheduler, stats, summary, fx, report
 from .reminder_engine import Letter
 
 DESCRIPTION = """API for chasing overdue invoice payments: reminder chain
@@ -579,6 +579,13 @@ def mark_copied(outbox_id: int, conn=Conn):
 @app.get("/api/health")
 def health():
     return {"ok": True}
+
+
+@app.post("/api/demo/load")
+def load_demo_data(conn=Conn):
+    """First-run experience: opt-in demo data — 2 clients + 3 invoices.
+    Refuses when the DB already holds data (never mixes with real work)."""
+    return demo.load_demo(conn)
 
 
 @app.get("/")
