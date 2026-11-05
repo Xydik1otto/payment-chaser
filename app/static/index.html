@@ -43,6 +43,11 @@ pre { white-space:pre-wrap; background:#f5f5f4; padding:10px; border-radius:6px;
       <span id="smtpNote" class="muted"></span>
     </div>
     <div id="runResult"></div>
+    <div style="margin-top:8px">
+      <button class="secondary" onclick="loadReport()">💱 Звіт у базовій валюті (ECB)</button>
+      <select id="baseCur" aria-label="базова валюта"><option>UAH</option><option>EUR</option><option>USD</option></select>
+    </div>
+    <div id="reportBox" class="hidden"><pre id="reportPre"></pre></div>
   </div>
 
   <div class="card">
@@ -112,6 +117,19 @@ async function loadDashboard() {
   document.getElementById('smtpNote').textContent = d.smtp_configured
     ? 'SMTP налаштовано — листи відправляються автоматично'
     : 'SMTP не налаштовано — листи чекають у outbox, копіюйте вручну';
+}
+
+async function loadReport() {
+  const d = await api('/api/report?base=' + encodeURIComponent(baseCur.value));
+  const lines = [
+    `Базова валюта: ${d.base_currency} · курси: ${d.rates_source}${d.rates_date ? ' (' + d.rates_date + ')' : ''}`,
+    `Всього прострочено (у базовій): ${d.total_overdue_base.toFixed(2)} ${d.base_currency} (${d.overdue_count} шт.)`,
+    ...Object.entries(d.buckets).map(([k, v]) => `  ${k} дн.: ${v.count} шт. — ${v.amount_base.toFixed(2)} ${d.base_currency}`),
+    `По валютах: ${Object.entries(d.by_currency).map(([c, a]) => `${c} ${a.toFixed(2)}`).join(', ') || '—'}`,
+    d.unconverted && Object.keys(d.unconverted).length ? `Не конвертовано (немає курсу): ${Object.entries(d.unconverted).map(([c, a]) => `${c} ${a.toFixed(2)}`).join(', ')}` : '',
+  ].filter(Boolean);
+  document.getElementById('reportPre').textContent = lines.join('\n');
+  document.getElementById('reportBox').classList.remove('hidden');
 }
 
 async function runEngine() {

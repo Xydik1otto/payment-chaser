@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response, HTMLResponse
 from pydantic import BaseModel
 
-from . import db, mailer, pdf, reminder_engine, scheduler, stats, summary
+from . import db, mailer, pdf, reminder_engine, scheduler, stats, summary, fx, report
 from .reminder_engine import Letter
 
 DESCRIPTION = """API for chasing overdue invoice payments: reminder chain
@@ -398,6 +398,7 @@ class SettingsIn(BaseModel):
     smtp_user: str | None = None
     smtp_pass: str | None = None   # write-only: stored, never returned
     smtp_from: str | None = None
+    base_currency: str | None = None
 
 
 @app.patch("/api/settings")
@@ -445,7 +446,20 @@ def dashboard(conn=Conn):
     invoices = [dict(r) for r in conn.execute("SELECT * FROM invoices")]
     stats = reminder_engine.compute_buckets(invoices, date.today())
     stats["smtp_configured"] = mailer.smtp_configured(conn)
+    stats["base_currency"] = fx.base_currency(conn)
     return stats
+
+
+# ---------------------------------------------------------------- ECB report
+
+
+@app.get("/api/report")
+def base_currency_report(base: str | None = None, refresh: bool = False, conn=Conn):
+    """Aging report re-expressed in the base currency (ECB daily reference
+    rates, cached in the DB; offline -> cache -> built-in fallback)."""
+    if refresh:
+        eff = fx.load_rates(conn, force_refresh=True)
+    return report.build_report(conn, date.today(), base=base)
 
 
 # ---------------------------------------------------------------- engine
