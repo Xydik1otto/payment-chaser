@@ -61,6 +61,16 @@ pre { white-space:pre-wrap; background:#f5f5f4; padding:10px; border-radius:6px;
   </div>
 
   <div class="card">
+    <h3>Налаштування компанії</h3>
+    <input id="sName" placeholder="Назва (напр. ФОП Шевченко)" style="width:220px">
+    <input id="sLogo" placeholder="Логотип — текст" style="width:150px">
+    <input id="sIban" placeholder="IBAN / реквізити" style="width:260px">
+    <input id="sEmail" placeholder="Email" style="width:180px">
+    <input id="sAddress" placeholder="Адреса" style="width:220px">
+    <button onclick="saveSettings()">Зберегти</button> <span id="settingsNote" class="muted"></span>
+  </div>
+
+  <div class="card">
     <h3>Черга листів (outbox)</h3>
     <div id="outboxBox" class="muted">порожньо</div>
   </div>
@@ -115,7 +125,7 @@ async function loadInvoices() {
     const tr = document.createElement('tr');
     if (r.status === 'overdue') tr.className = 'overdue';
     tr.innerHTML = `<td>${r.number}</td><td>${r.client_name}</td><td>${r.amount.toFixed(2)} ${r.currency}</td><td>${r.due_date}</td>` +
-      `<td>${r.status}</td><td>${r.status !== 'paid' ? `<button class="ok" onclick="markPaid(${r.id})">Оплачено</button>` : ''}</td>`;
+      `<td>${r.status}</td><td>${r.status !== 'paid' ? `<button class="ok" onclick="markPaid(${r.id})">Оплачено</button> ` : ''}<a href="/api/invoices/${r.id}/pdf" target="_blank">PDF</a></td>`;
     tb.appendChild(tr);
   });
 }
@@ -145,7 +155,22 @@ async function copyMail(id, btn) {
   await api(`/api/outbox/${id}/mark-copied`, { method: 'POST' });
 }
 
-loadDashboard(); loadClients(); loadInvoices(); loadOutbox();
+async function loadSettings() {
+  const s = await api('/api/settings');
+  sName.value = s.company_name || ''; sLogo.value = s.company_logo || '';
+  sIban.value = s.company_iban || ''; sEmail.value = s.company_email || '';
+  sAddress.value = s.company_address || '';
+}
+
+async function saveSettings() {
+  await api('/api/settings', { method: 'PATCH', body: JSON.stringify({
+    company_name: sName.value, company_logo: sLogo.value, company_iban: sIban.value,
+    company_email: sEmail.value, company_address: sAddress.value,
+  })});
+  document.getElementById('settingsNote').textContent = '✓ збережено';
+}
+
+loadDashboard(); loadClients(); loadInvoices(); loadOutbox(); loadSettings();
 </script>
 </body>
 </html>

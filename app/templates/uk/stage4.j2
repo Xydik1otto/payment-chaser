@@ -1,4 +1,7 @@
 SUBJECT: Останнє попередження: рахунок {{ invoice_number }} — {{ days_overdue }} дн. прострочення
+{% if company_logo %}
+{{ company_logo }}
+{% endif %}
 {{ client_name }}, вітаємо!
 
 Рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
@@ -11,6 +14,9 @@ SUBJECT: Останнє попередження: рахунок {{ invoice_numb
 
 {% if payment_link %}
 Оплатити онлайн: {{ payment_link }}
+{% endif %}
+{% if company_iban %}
+Реквізити для оплати: {{ company_iban }}
 {% endif %}
 З повагою,
 {{ company_name }}

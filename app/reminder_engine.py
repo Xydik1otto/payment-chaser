@@ -15,6 +15,8 @@ from datetime import date
 
 from jinja2 import Environment, FileSystemLoader
 
+from . import db
+
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
 STAGES = {
@@ -148,9 +150,12 @@ def build_letters(conn, today: date, late_fee_percent: float = 0.0) -> list[Lett
     letters = []
     for inv, stage in due_today(conn, today):
         d = days_overdue(inv["due_date"], today)
+        s = db.get_settings(conn)
         ctx = {
             "client_name": inv["client_name"],
-            "company_name": os.environ.get("CHASER_COMPANY_NAME", "Payment Chaser"),
+            "company_name": s["company_name"] or "Payment Chaser",
+            "company_iban": s["company_iban"],
+            "company_logo": s["company_logo"],
             "invoice_number": inv["number"],
             "amount": f"{inv['amount']:.2f}",
             "currency": inv["currency"],

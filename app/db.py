@@ -54,6 +54,11 @@ CREATE TABLE IF NOT EXISTS outbox (
     copied_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_reminders_invoice ON reminders(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 """
@@ -93,3 +98,37 @@ def _migrate(conn: sqlite3.Connection) -> None:
     for col, ddl in _EXTRA_INVOICE_COLUMNS.items():
         if col not in existing:
             conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} {ddl}")
+
+
+# ---------------------------------------------------------------- settings
+
+SETTING_KEYS = ("company_name", "company_address", "company_email",
+                "company_iban", "company_logo")
+
+# env fallbacks used when a key is not stored in the DB
+_SETTING_ENV_DEFAULTS = {
+    "company_name": "CHASER_COMPANY_NAME",
+    "company_address": "CHASER_COMPANY_ADDRESS",
+    "company_email": "CHASER_COMPANY_EMAIL",
+    "company_iban": "CHASER_COMPANY_IBAN",
+}
+
+
+def get_settings(conn) -> dict[str, str]:
+    """Stored settings overlaid on env defaults; missing keys -> ''."""
+    stored = {r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM settings")}
+    out = {}
+    for key in SETTING_KEYS:
+        env_var = _SETTING_ENV_DEFAULTS.get(key)
+        out[key] = stored.get(key) or (os.environ.get(env_var, "") if env_var else "")
+    return out
+
+
+def set_settings(conn, values: dict[str, str]) -> None:
+    """Upsert the given setting keys (unknown keys are rejected by the API)."""
+    for key, value in values.items():
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )

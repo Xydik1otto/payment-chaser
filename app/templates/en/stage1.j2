@@ -1,4 +1,7 @@
 SUBJECT: Friendly reminder: invoice {{ invoice_number }} for {{ amount }} {{ currency }}
+{% if company_logo %}
+{{ company_logo }}
+{% endif %}
 Hi {{ client_name }}!
 
 Just a friendly reminder that invoice {{ invoice_number }} for {{ amount }} {{ currency }}
@@ -8,6 +11,9 @@ If you have already paid — please ignore this email, thank you!
 
 {% if payment_link %}
 Pay online: {{ payment_link }}
+{% endif %}
+{% if company_iban %}
+Payment details: {{ company_iban }}
 {% endif %}
 Best regards,
 {{ company_name }}

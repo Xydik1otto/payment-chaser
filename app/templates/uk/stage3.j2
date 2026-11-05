@@ -1,4 +1,7 @@
 SUBJECT: ТЕРМІНОВО: рахунок {{ invoice_number }} прострочений на {{ days_overdue }} дн.
+{% if company_logo %}
+{{ company_logo }}
+{% endif %}
 {{ client_name }}, вітаємо!
 
 Рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
@@ -8,6 +11,9 @@ SUBJECT: ТЕРМІНОВО: рахунок {{ invoice_number }} простро�
 
 {% if payment_link %}
 Оплатити онлайн: {{ payment_link }}
+{% endif %}
+{% if company_iban %}
+Реквізити для оплати: {{ company_iban }}
 {% endif %}
 З повагою,
 {{ company_name }}

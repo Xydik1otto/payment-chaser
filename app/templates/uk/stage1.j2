@@ -1,4 +1,7 @@
 SUBJECT: Нагадування: рахунок {{ invoice_number }} на {{ amount }} {{ currency }}
+{% if company_logo %}
+{{ company_logo }}
+{% endif %}
 Вітаємо, {{ client_name }}!
 
 Нагадуємо, що рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
@@ -8,6 +11,9 @@ SUBJECT: Нагадування: рахунок {{ invoice_number }} на {{ amo
 
 {% if payment_link %}
 Оплатити онлайн: {{ payment_link }}
+{% endif %}
+{% if company_iban %}
+Реквізити для оплати: {{ company_iban }}
 {% endif %}
 З повагою,
 {{ company_name }}

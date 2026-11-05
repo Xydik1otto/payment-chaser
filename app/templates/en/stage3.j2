@@ -1,4 +1,7 @@
 SUBJECT: URGENT: invoice {{ invoice_number }} is {{ days_overdue }} days overdue
+{% if company_logo %}
+{{ company_logo }}
+{% endif %}
 Hi {{ client_name }}!
 
 Invoice {{ invoice_number }} for {{ amount }} {{ currency }}
@@ -9,6 +12,9 @@ within 3 business days.
 
 {% if payment_link %}
 Pay online: {{ payment_link }}
+{% endif %}
+{% if company_iban %}
+Payment details: {{ company_iban }}
 {% endif %}
 Best regards,
 {{ company_name }}

@@ -1,4 +1,7 @@
 SUBJECT: Final notice: invoice {{ invoice_number }} — {{ days_overdue }} days overdue
+{% if company_logo %}
+{{ company_logo }}
+{% endif %}
 Hi {{ client_name }}!
 
 Invoice {{ invoice_number }} for {{ amount }} {{ currency }}
@@ -11,6 +14,9 @@ Please pay within 5 days.
 
 {% if payment_link %}
 Pay online: {{ payment_link }}
+{% endif %}
+{% if company_iban %}
+Payment details: {{ company_iban }}
 {% endif %}
 Best regards,
 {{ company_name }}

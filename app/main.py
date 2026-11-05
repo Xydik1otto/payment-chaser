@@ -158,7 +158,12 @@ def invoice_pdf(invoice_id: int, conn=Conn):
     ).fetchone()
     if row is None:
         raise HTTPException(404, "Invoice not found")
-    data = pdf.render_pdf(dict(row), {"name": row["client_name"], "email": row["client_email"]})
+    s = db.get_settings(conn)
+    seller = {"name": s["company_name"], "address": s["company_address"],
+              "email": s["company_email"], "iban": s["company_iban"],
+              "logo": s["company_logo"]}
+    data = pdf.render_pdf(dict(row), {"name": row["client_name"], "email": row["client_email"]},
+                          seller=seller)
     return Response(
         content=data,
         media_type="application/pdf",
@@ -198,6 +203,31 @@ table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #ddd;padding
 
 
 # ---------------------------------------------------------------- dashboard
+
+
+# ---------------------------------------------------------------- settings
+
+
+@app.get("/api/settings")
+def get_settings(conn=Conn):
+    return db.get_settings(conn)
+
+
+class SettingsIn(BaseModel):
+    company_name: str | None = None
+    company_address: str | None = None
+    company_email: str | None = None
+    company_iban: str | None = None
+    company_logo: str | None = None
+
+
+@app.patch("/api/settings")
+def patch_settings(body: SettingsIn, conn=Conn):
+    values = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not values:
+        raise HTTPException(422, "no settings to update")
+    db.set_settings(conn, values)
+    return db.get_settings(conn)
 
 
 @app.get("/api/dashboard")

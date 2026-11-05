@@ -22,18 +22,19 @@ def seller_details() -> dict:
     }
 
 
-def render_pdf(invoice: dict, client: dict) -> bytes:
+def render_pdf(invoice: dict, client: dict, seller: dict | None = None) -> bytes:
     """invoice: row dict (number, amount, currency, issued_date, due_date, status);
-    client: row dict (name, email). Returns PDF bytes."""
-    seller = seller_details()
+    client: row dict (name, email); seller: company details (DB settings or env
+    defaults when None). Returns PDF bytes."""
+    seller = seller or seller_details()
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     w, h = A4
     x, y = 25 * mm, h - 25 * mm
 
-    # seller block (requisites)
+    # logo text + seller block (requisites)
     c.setFont("Helvetica-Bold", 16)
-    c.drawString(x, y, seller["name"])
+    c.drawString(x, y, seller.get("logo") or seller["name"])
     c.setFont("Helvetica", 10)
     y -= 6 * mm
     for line in (seller["address"], seller["email"], seller["iban"]):
