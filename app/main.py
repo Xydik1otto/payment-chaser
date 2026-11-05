@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response, HTMLResponse
 from pydantic import BaseModel
 
-from . import db, demo, mailer, pdf, reminder_engine, scheduler, stats, summary, fx, report
+from . import db, demo, exporter, mailer, pdf, reminder_engine, scheduler, stats, summary, fx, report
 from .reminder_engine import Letter
 
 DESCRIPTION = """API for chasing overdue invoice payments: reminder chain
@@ -586,6 +586,40 @@ def load_demo_data(conn=Conn):
     """First-run experience: opt-in demo data — 2 clients + 3 invoices.
     Refuses when the DB already holds data (never mixes with real work)."""
     return demo.load_demo(conn)
+
+
+@app.get("/api/export")
+def export_json(conn=Conn):
+    """One-click export of all data as JSON (data safety)."""
+    data = exporter.export_all(conn)
+    return Response(
+        content=exporter.to_json_bytes(data),
+        media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="payment-chaser-export.json"'},
+    )
+
+
+@app.get("/api/export/invoices.csv")
+def export_csv(conn=Conn):
+    """One-click export of invoices as CSV (Excel-friendly)."""
+    return Response(
+        content=exporter.export_invoices_csv(conn).encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="payment-chaser-invoices.csv"'},
+    )
+
+
+@app.post("/api/invoices/{invoice_id}/delete")
+def delete_invoice(invoice_id: int, conn=Conn):
+    """Delete an invoice with its items, reminders and outbox rows.
+    The UI asks for confirmation before calling this."""
+    return exporter.delete_invoice(conn, invoice_id)
+
+
+@app.post("/api/clients/{client_id}/delete")
+def delete_client(client_id: int, conn=Conn):
+    """Delete a client; refused while invoices still reference them."""
+    return exporter.delete_client(conn, client_id)
 
 
 @app.get("/")
