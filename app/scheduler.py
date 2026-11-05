@@ -41,9 +41,18 @@ def run_once() -> int:
     return len(letters)
 
 
+_STOP = threading.Event()
+
+
+def stop() -> None:
+    """Signal the running scheduler loop to exit (used by tests)."""
+    _STOP.set()
+
+
 def _loop(interval: int, on_error=print) -> None:
-    while True:
-        threading.Event().wait(interval)
+    while not _STOP.is_set():
+        if _STOP.wait(interval):  # True -> stop signalled while waiting
+            break
         try:
             run_once()
         except Exception:
@@ -54,6 +63,7 @@ def start(interval: int | None = None, daemon: bool = True) -> threading.Thread 
     """Start the scheduler thread. Returns the thread, or None if disabled."""
     if not enabled():
         return None
+    _STOP.clear()
     interval = interval if interval is not None else interval_seconds()
     t = threading.Thread(target=_loop, args=(interval,), name="chaser-scheduler", daemon=daemon)
     t.start()

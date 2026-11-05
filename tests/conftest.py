@@ -19,6 +19,7 @@ def client(tmp_path, monkeypatch):
     test_db = str(tmp_path / "test.db")
     monkeypatch.setenv("CHASER_DB", test_db)
     monkeypatch.delenv("SMTP_HOST", raising=False)  # default: outbox mode
+    monkeypatch.setenv("DISABLE_SCHEDULER", "1")  # no rogue background engine runs
     db_mod.init_db(test_db)
     c = TestClient(app)
     return c

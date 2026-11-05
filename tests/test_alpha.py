@@ -37,6 +37,7 @@ def test_scheduler_thread_runs_engine(monkeypatch, tmp_path):
     monkeypatch.setattr(scheduler, "run_once", lambda: calls.append(1) or 0)
     with TestClient(app):  # enters lifespan -> scheduler.start()
         time.sleep(2.5)    # interval 1s -> at least 2 ticks
+    scheduler.stop()       # kill the thread: otherwise it keeps running real engine passes
     assert len(calls) >= 2
 
 
