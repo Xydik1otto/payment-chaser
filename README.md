@@ -53,6 +53,18 @@
 12. **Щотижневе зведення власнику** — `POST /api/summary/weekly` або
     автоматично щопонеділка зі scheduler: нові прострочені та оплачені
     за тиждень, у outbox для `CHASER_OWNER_EMAIL`.
+13. **Позиції інвойсу** (item / qty / price) — багаторядкові інвойси:
+    сума рахується з позицій, таблиця позицій у PDF і в кожному листі.
+14. **Часткові оплати** — `POST /api/invoices/{id}/payment` додає платіж,
+    статус сам переходить у `partial`, листи просять залишок, дашборд
+    рахує `outstanding` (загальний борг = сума − сплачене).
+15. **Прев'ю листа** — `GET /api/invoices/{id}/preview` (і кнопка в UI):
+    HTML-лист, який отримає клієнт, ще до відправки; нічого не шле і
+    не зберігає. Параметри `?stage=` / `?language=` — перевизначити.
+16. **Локалізовані суми** — uk: `1 234,56 ₴`, en: `$1,234.56` — у листах
+    і PDF (мова береться з профілю клієнта).
+17. **systemd timer** — готовий приклад запуску движка щодня без Docker
+    (див. нижче).
 
 ## Як це працює
 
@@ -105,6 +117,51 @@ Cron (щодня о 09:00) — якщо scheduler вимкнено:
 ```
 0 9 * * * curl -s -X POST http://127.0.0.1:8000/api/engine/run
 ```
+
+### systemd timer (без Docker, без cron)
+
+Два файли в `/etc/systemd/system/`:
+
+`payment-chaser.service` (oneshot-юніт — один прохід движка):
+
+```ini
+[Unit]
+Description=Payment Chaser: fire due reminder letters
+
+[Service]
+Type=oneshot
+User=youruser
+WorkingDirectory=/opt/payment-chaser
+# env-змінні можна тримати в окремому файлі
+EnvironmentFile=/opt/payment-chaser/.env
+ExecStart=/opt/payment-chaser/.venv/bin/python -c "from app import scheduler; print(scheduler.run_once())"
+```
+
+`payment-chaser.timer` (щодня о 09:00):
+
+```ini
+[Unit]
+Description=Run Payment Chaser engine daily
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Активация:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now payment-chaser.timer
+systemctl list-timers payment-chaser.timer   # перевірити
+```
+
+`Persistent=true` доганяє пропуск (якщо машина була вимкнена о 09:00,
+запуск одразу після ввімкнення). Сервер (`uvicorn`) при цьому може взагалі
+не працювати постійно — движок ходить напряму в SQLite.
 
 ## Стек
 
