@@ -110,9 +110,12 @@ def next_stage(conn, invoice_id: int) -> int | None:
 
 
 def due_today(conn, today: date) -> list[tuple[dict, int]]:
-    """Letters that should fire today: (invoice, stage) pairs."""
+    """Letters that should fire today: (invoice, stage) pairs.
+    Invoices with chaser_paused=1 are skipped entirely."""
     pairs = []
     for inv in overdue_invoices(conn, today):
+        if inv.get("chaser_paused"):
+            continue  # chaser paused for this invoice (with reason)
         stage = next_stage(conn, inv["id"])
         if stage is None:
             continue  # full chain already sent

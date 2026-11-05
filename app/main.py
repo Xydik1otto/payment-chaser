@@ -131,6 +131,26 @@ class InvoicePatch(BaseModel):
     status: str
 
 
+class PauseIn(BaseModel):
+    paused: bool
+    reason: str = ""
+
+
+@app.post("/api/invoices/{invoice_id}/pause")
+def pause_invoice(invoice_id: int, body: PauseIn, conn=Conn):
+    """Pause/resume the reminder chaser for one invoice (with a reason)."""
+    if body.paused and not body.reason.strip():
+        raise HTTPException(422, "reason is required when pausing")
+    cur = conn.execute(
+        "UPDATE invoices SET chaser_paused = ?, pause_reason = ? WHERE id = ?",
+        (1 if body.paused else 0, body.reason.strip() if body.paused else None, invoice_id),
+    )
+    if cur.rowcount == 0:
+        raise HTTPException(404, "Invoice not found")
+    return {"ok": True, "id": invoice_id, "paused": body.paused,
+            "reason": body.reason.strip() if body.paused else None}
+
+
 @app.patch("/api/invoices/{invoice_id}")
 def patch_invoice(invoice_id: int, body: InvoicePatch, conn=Conn):
     if body.status not in ("draft", "sent", "overdue", "paid"):

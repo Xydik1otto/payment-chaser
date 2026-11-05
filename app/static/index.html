@@ -125,7 +125,12 @@ async function loadInvoices() {
     const tr = document.createElement('tr');
     if (r.status === 'overdue') tr.className = 'overdue';
     tr.innerHTML = `<td>${r.number}</td><td>${r.client_name}</td><td>${r.amount.toFixed(2)} ${r.currency}</td><td>${r.due_date}</td>` +
-      `<td>${r.status}</td><td>${r.status !== 'paid' ? `<button class="ok" onclick="markPaid(${r.id})">Оплачено</button> ` : ''}<a href="/api/invoices/${r.id}/pdf" target="_blank">PDF</a></td>`;
+      `<td>${r.status}${r.chaser_paused ? ' <span class="muted" title="' + (r.pause_reason || '') + '">⏸ пауза</span>' : ''}</td>` +
+      `<td>${r.status !== 'paid' ? `<button class="ok" onclick="markPaid(${r.id})">Оплачено</button> ` : ''}` +
+      `${r.status !== 'paid' ? (r.chaser_paused
+        ? `<button class="secondary" onclick="setPause(${r.id}, false)">Відновити</button>`
+        : `<button class="secondary" onclick="setPause(${r.id}, true)">Пауза</button>`) : ''}` +
+      `<a href="/api/invoices/${r.id}/pdf" target="_blank">PDF</a></td>`;
     tb.appendChild(tr);
   });
 }
@@ -153,6 +158,16 @@ async function copyMail(id, btn) {
   });
   btn.textContent = '✓ скопійовано'; btn.disabled = true;
   await api(`/api/outbox/${id}/mark-copied`, { method: 'POST' });
+}
+
+async function setPause(id, paused) {
+  let reason = '';
+  if (paused) {
+    reason = prompt('Причина паузи нагадувань (обов\'язково):') || '';
+    if (!reason.trim()) return;  // cancelled / empty -> do nothing
+  }
+  await api(`/api/invoices/${id}/pause`, { method: 'POST', body: JSON.stringify({ paused, reason }) });
+  await loadInvoices();
 }
 
 async function loadSettings() {
