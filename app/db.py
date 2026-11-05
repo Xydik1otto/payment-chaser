@@ -110,6 +110,14 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if col not in existing:
             conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} {ddl}")
     _migrate_partial_check(conn)
+    _migrate_client_terms(conn)
+
+
+def _migrate_client_terms(conn: sqlite3.Connection) -> None:
+    """v1.0.0: per-client payment terms (net 7/14/30; 0 = manual due dates)."""
+    existing = {r["name"] for r in conn.execute("PRAGMA table_info(clients)")}
+    if "payment_terms" not in existing:
+        conn.execute("ALTER TABLE clients ADD COLUMN payment_terms INTEGER NOT NULL DEFAULT 0")
 
 
 def _migrate_partial_check(conn: sqlite3.Connection) -> None:

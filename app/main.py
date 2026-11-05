@@ -11,7 +11,7 @@ Routes:
 """
 import os
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response, HTMLResponse
@@ -63,15 +63,22 @@ class ClientIn(BaseModel):
     name: str
     email: str
     language: str = "uk"  # 'uk' | 'en'
+    payment_terms: int = 0  # net days: 0 (manual due dates) | 7 | 14 | 30
+
+
+def _validate_terms(terms: int) -> None:
+    if terms not in (0, 7, 14, 30):
+        raise HTTPException(422, "payment_terms must be one of 0, 7, 14, 30")
 
 
 @app.post("/api/clients")
 def create_client(body: ClientIn, conn=Conn):
     if body.language not in reminder_engine.LANGUAGES:
         raise HTTPException(422, f"language must be one of {reminder_engine.LANGUAGES}")
+    _validate_terms(body.payment_terms)
     cur = conn.execute(
-        "INSERT INTO clients (name, email, language, created_at) VALUES (?, ?, ?, ?)",
-        (body.name, body.email, body.language, db.now_iso()),
+        "INSERT INTO clients (name, email, language, payment_terms, created_at) VALUES (?, ?, ?, ?, ?)",
+        (body.name, body.email, body.language, body.payment_terms, db.now_iso()),
     )
     return {"id": cur.lastrowid, **body.model_dump()}
 
@@ -79,6 +86,30 @@ def create_client(body: ClientIn, conn=Conn):
 @app.get("/api/clients")
 def list_clients(conn=Conn):
     return [dict(r) for r in conn.execute("SELECT * FROM clients ORDER BY id DESC")]
+
+
+class ClientPatch(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    language: str | None = None
+    payment_terms: int | None = None
+
+
+@app.patch("/api/clients/{client_id}")
+def patch_client(client_id: int, body: ClientPatch, conn=Conn):
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(422, "nothing to update")
+    if "language" in updates and updates["language"] not in reminder_engine.LANGUAGES:
+        raise HTTPException(422, f"language must be one of {reminder_engine.LANGUAGES}")
+    if "payment_terms" in updates:
+        _validate_terms(updates["payment_terms"])
+    row = conn.execute("SELECT id FROM clients WHERE id = ?", (client_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Client not found")
+    sets = ", ".join(f"{k} = ?" for k in updates)
+    conn.execute(f"UPDATE clients SET {sets} WHERE id = ?", (*updates.values(), client_id))
+    return {"ok": True, "id": client_id, **updates}
 
 
 # ---------------------------------------------------------------- invoices
@@ -96,7 +127,8 @@ class InvoiceIn(BaseModel):
     amount: float | None = None  # computed from items when items are given
     currency: str = "UAH"
     issued_date: str
-    due_date: str
+    due_date: str | None = None  # auto-computed from payment terms when omitted
+    payment_terms: int | None = None  # per-invoice override of the client's terms
     items: list[ItemIn] = []
 
 
@@ -104,11 +136,29 @@ class InvoiceIn(BaseModel):
 def create_invoice(body: InvoiceIn, conn=Conn):
     try:
         date.fromisoformat(body.issued_date)
-        date.fromisoformat(body.due_date)
     except ValueError:
         raise HTTPException(422, "dates must be ISO format YYYY-MM-DD")
-    if conn.execute("SELECT 1 FROM clients WHERE id = ?", (body.client_id,)).fetchone() is None:
+    client_row = conn.execute("SELECT * FROM clients WHERE id = ?", (body.client_id,)).fetchone()
+    if client_row is None:
         raise HTTPException(404, "Client not found")
+    client = dict(client_row)
+    # due date: explicit -> as given; omitted -> issued_date + payment terms
+    # (per-invoice override wins, else the client's profile terms, net 7/14/30)
+    terms = body.payment_terms if body.payment_terms is not None else (client.get("payment_terms") or 0)
+    if terms and terms not in (7, 14, 30):
+        raise HTTPException(422, "payment_terms must be one of 0, 7, 14, 30")
+    if body.due_date:
+        due_date = body.due_date
+        due_computed = False
+        try:
+            date.fromisoformat(due_date)
+        except ValueError:
+            raise HTTPException(422, "dates must be ISO format YYYY-MM-DD")
+    else:
+        if not terms:
+            raise HTTPException(422, "due_date is required when the client has no payment terms (net 0)")
+        due_date = (date.fromisoformat(body.issued_date) + timedelta(days=terms)).isoformat()
+        due_computed = True
     items = [it.model_dump() for it in body.items]
     for it in items:
         if not it["item"].strip():
@@ -124,7 +174,7 @@ def create_invoice(body: InvoiceIn, conn=Conn):
             "INSERT INTO invoices (number, client_id, amount, currency, issued_date, due_date, status, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)",
             (body.number, body.client_id, amount, body.currency,
-             body.issued_date, body.due_date, db.now_iso()),
+             body.issued_date, due_date, db.now_iso()),
         )
     except Exception as exc:
         if "UNIQUE" in str(exc):
@@ -135,7 +185,8 @@ def create_invoice(body: InvoiceIn, conn=Conn):
         db.add_items(conn, invoice_id, items)
     return {"id": invoice_id, "number": body.number, "client_id": body.client_id,
             "amount": amount, "currency": body.currency, "issued_date": body.issued_date,
-            "due_date": body.due_date, "status": "draft",
+            "due_date": due_date, "due_computed": due_computed, "payment_terms": terms,
+            "status": "draft",
             "items": [{**it, "total": round(it["qty"] * it["price"], 2)} for it in items]}
 
 
