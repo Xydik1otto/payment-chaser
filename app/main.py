@@ -274,6 +274,47 @@ def patch_invoice(invoice_id: int, body: InvoicePatch, conn=Conn):
 # ---------------------------------------------------------------- PDF
 
 
+@app.get("/api/invoices/{invoice_id}/preview")
+def letter_preview(invoice_id: int, stage: int | None = None,
+                   language: str | None = None, conn=Conn):
+    """HTML preview of the reminder letter for this invoice — what the client
+    would receive. Nothing is sent or persisted. Defaults: the next chain
+    stage and the client's language; both overridable via query params."""
+    row = conn.execute(
+        "SELECT i.*, c.name AS client_name, c.email AS client_email, c.language "
+        "FROM invoices i JOIN clients c ON c.id = i.client_id WHERE i.id = ?",
+        (invoice_id,),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Invoice not found")
+    inv = dict(row)
+    if stage is None:
+        stage = reminder_engine.next_stage(conn, invoice_id) or 4
+    if stage not in reminder_engine.STAGES:
+        raise HTTPException(422, f"stage must be one of {sorted(reminder_engine.STAGES)}")
+    language = language or inv["language"]
+    if language not in reminder_engine.LANGUAGES:
+        raise HTTPException(422, f"language must be one of {reminder_engine.LANGUAGES}")
+    ctx = reminder_engine.letter_ctx(conn, inv, stage=stage)
+    subject, body = reminder_engine.render(stage, language, ctx)
+    stage_name = reminder_engine.STAGES[stage]["name"]
+    import html as html_mod
+    safe_subject, safe_body = html_mod.escape(subject), html_mod.escape(body)
+    return HTMLResponse(f"""<!DOCTYPE html><html lang="{language}"><head><meta charset="utf-8">
+<title>Preview: {safe_subject}</title>
+<style>body{{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 16px}}
+.meta{{color:#78716c;font-size:13px}}pre{{white-space:pre-wrap;font-family:inherit;
+background:#fafaf9;border:1px solid #e7e5e4;border-radius:8px;padding:16px}}
+button{{background:#dc2626;color:#fff;border:0;border-radius:6px;padding:8px 14px;cursor:pointer}}
+button.secondary{{background:#78716c}}</style></head><body>
+<p class="meta">Прев'ю листа · інвойс {html_mod.escape(inv['number'])} ·
+стадія {stage} ({stage_name}) · мова {language} · <b>не відправлено, не збережено</b></p>
+<h2>To: {html_mod.escape(inv['client_email'])}</h2>
+<h3>Subject: {safe_subject}</h3>
+<pre>{safe_body}</pre>
+<p><a href="/">← назад до дашборда</a></p></body></html>""")
+
+
 @app.get("/api/invoices/{invoice_id}/pdf")
 def invoice_pdf(invoice_id: int, conn=Conn):
     row = conn.execute(

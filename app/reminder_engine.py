@@ -153,36 +153,43 @@ def payment_link(invoice_number: str) -> str:
     return tpl.replace("{invoice_number}", invoice_number)
 
 
+def letter_ctx(conn, inv: dict, late_fee_percent: float = 0.0, stage: int = 1) -> dict:
+    """Template context for one invoice's letter (shared by build_letters
+    and the preview endpoint)."""
+    s = db.get_settings(conn)
+    items = db.get_items(conn, inv["id"])
+    owed = db.outstanding(inv)  # partial payments: chase the remainder
+    return {
+        "client_name": inv["client_name"],
+        "company_name": s["company_name"] or "Payment Chaser",
+        "company_iban": s["company_iban"],
+        "company_logo": s["company_logo"],
+        "invoice_number": inv["number"],
+        "amount": f"{owed:.2f}",
+        "amount_paid": f"{inv['amount_paid'] or 0:.2f}",
+        "currency": inv["currency"],
+        "items": [
+            {"item": it["item"], "qty": f"{it['qty']:g}",
+             "price": f"{it['price']:.2f}", "total": f"{it['qty'] * it['price']:.2f}"}
+            for it in items
+        ],
+        "days_overdue": days_overdue(inv["due_date"], date.today()),
+        "due_date": inv["due_date"],
+        "payment_link": payment_link(inv["number"]),
+        "late_fee_line": (
+            f"Late fee ({late_fee_percent}%): {owed * late_fee_percent / 100:.2f} {inv['currency']}"
+            if stage == 4 and late_fee_percent > 0 else ""
+        ),
+    }
+
+
 def build_letters(conn, today: date, late_fee_percent: float = 0.0) -> list[Letter]:
     """Generate all letters due today (does NOT send or persist)."""
     letters = []
     for inv, stage in due_today(conn, today):
         d = days_overdue(inv["due_date"], today)
-        s = db.get_settings(conn)
-        items = db.get_items(conn, inv["id"])
-        owed = db.outstanding(inv)  # partial payments: chase the remainder
-        ctx = {
-            "client_name": inv["client_name"],
-            "company_name": s["company_name"] or "Payment Chaser",
-            "company_iban": s["company_iban"],
-            "company_logo": s["company_logo"],
-            "invoice_number": inv["number"],
-            "amount": f"{owed:.2f}",
-            "amount_paid": f"{inv['amount_paid'] or 0:.2f}",
-            "currency": inv["currency"],
-            "items": [
-                {"item": it["item"], "qty": f"{it['qty']:g}",
-                 "price": f"{it['price']:.2f}", "total": f"{it['qty'] * it['price']:.2f}"}
-                for it in items
-            ],
-            "days_overdue": d,
-            "due_date": inv["due_date"],
-            "payment_link": payment_link(inv["number"]),
-            "late_fee_line": (
-                f"Late fee ({late_fee_percent}%): {owed * late_fee_percent / 100:.2f} {inv['currency']}"
-                if stage == 4 and late_fee_percent > 0 else ""
-            ),
-        }
+        ctx = letter_ctx(conn, inv, late_fee_percent=late_fee_percent, stage=stage)
+        ctx["days_overdue"] = d
         subject, body = render(stage, inv["language"], ctx)
         letters.append(Letter(
             invoice_id=inv["id"], invoice_number=inv["number"],

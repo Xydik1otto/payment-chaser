@@ -133,6 +133,7 @@ async function loadInvoices() {
       `${r.status !== 'paid' ? (r.chaser_paused
         ? `<button class="secondary" onclick="setPause(${r.id}, false)">Відновити</button>`
         : `<button class="secondary" onclick="setPause(${r.id}, true)">Пауза</button>`) : ''}` +
+      `<a href="/api/invoices/${r.id}/preview" target="_blank">Прев'ю</a> ` +
       `<a href="/api/invoices/${r.id}/pdf" target="_blank">PDF</a></td>`;
     tb.appendChild(tr);
   });
