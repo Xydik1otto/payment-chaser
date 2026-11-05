@@ -4,6 +4,15 @@
 Формат — [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 версіонування — [SemVer](https://semver.org/lang/uk/).
 
+## [Unreleased]
+
+### Removed
+- Monetization scaffolding: проєкт тепер 100% безкоштовний open-source.
+  Видалено `.github/FUNDING.yml` (GitHub Sponsors); з PLAN.md прибрано
+  розділ «Монетизація» та комерційні цілі в roadmap ($15–29/міс, MRR,
+  платні підписки) — залишилось тільки боль-evidence у README.
+  Усі фічі вільні, жодна не заблокована за оплату.
+
 ## [1.0.0] — 2026-11-05
 
 ### Added
