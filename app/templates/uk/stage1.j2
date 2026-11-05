@@ -6,5 +6,8 @@ SUBJECT: Нагадування: рахунок {{ invoice_number }} на {{ amo
 
 Якщо оплата вже здійснена — проігноруйте цей лист, дякуємо!
 
+{% if payment_link %}
+Оплатити онлайн: {{ payment_link }}
+{% endif %}
 З повагою,
 {{ company_name }}

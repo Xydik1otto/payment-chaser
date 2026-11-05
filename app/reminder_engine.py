@@ -131,6 +131,18 @@ def render(stage: int, language: str, ctx: dict) -> tuple[str, str]:
     return subject.removeprefix("SUBJECT: ").strip(), body.strip()
 
 
+def payment_link(invoice_number: str) -> str:
+    """Configurable 'pay now' link for letters (e.g. Stripe test-mode checkout).
+
+    CHASER_PAYMENT_LINK_TEMPLATE may contain the {invoice_number} placeholder,
+    e.g. https://buy.stripe.com/test_{invoice_number}. Empty -> no link.
+    """
+    tpl = os.environ.get("CHASER_PAYMENT_LINK_TEMPLATE", "").strip()
+    if not tpl:
+        return ""
+    return tpl.replace("{invoice_number}", invoice_number)
+
+
 def build_letters(conn, today: date, late_fee_percent: float = 0.0) -> list[Letter]:
     """Generate all letters due today (does NOT send or persist)."""
     letters = []
@@ -144,6 +156,7 @@ def build_letters(conn, today: date, late_fee_percent: float = 0.0) -> list[Lett
             "currency": inv["currency"],
             "days_overdue": d,
             "due_date": inv["due_date"],
+            "payment_link": payment_link(inv["number"]),
             "late_fee_line": (
                 f"Late fee ({late_fee_percent}%): {inv['amount'] * late_fee_percent / 100:.2f} {inv['currency']}"
                 if stage == 4 and late_fee_percent > 0 else ""

@@ -9,5 +9,8 @@ SUBJECT: Останнє попередження: рахунок {{ invoice_numb
 {% endif %}
 Будь ласка, оплатіть протягом 5 днів.
 
+{% if payment_link %}
+Оплатити онлайн: {{ payment_link }}
+{% endif %}
 З повагою,
 {{ company_name }}

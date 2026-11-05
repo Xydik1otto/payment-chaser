@@ -7,5 +7,8 @@ is now {{ days_overdue }} days overdue (payment due: {{ due_date }}).
 Please arrange payment at your earliest convenience, or let us know
 if you have any questions about the invoice.
 
+{% if payment_link %}
+Pay online: {{ payment_link }}
+{% endif %}
 Best regards,
 {{ company_name }}

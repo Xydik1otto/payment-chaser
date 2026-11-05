@@ -9,5 +9,8 @@ This is a final notice before the matter is handed to collections.
 {% endif %}
 Please pay within 5 days.
 
+{% if payment_link %}
+Pay online: {{ payment_link }}
+{% endif %}
 Best regards,
 {{ company_name }}

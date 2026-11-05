@@ -6,5 +6,8 @@ was issued with payment due on {{ due_date }}.
 
 If you have already paid — please ignore this email, thank you!
 
+{% if payment_link %}
+Pay online: {{ payment_link }}
+{% endif %}
 Best regards,
 {{ company_name }}
