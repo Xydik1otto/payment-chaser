@@ -15,7 +15,7 @@ from datetime import date
 
 from jinja2 import Environment, FileSystemLoader
 
-from . import db
+from . import db, money
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
@@ -130,12 +130,14 @@ def due_today(conn, today: date) -> list[tuple[dict, int]]:
 
 
 def render(stage: int, language: str, ctx: dict) -> tuple[str, str]:
-    """Render subject+body from Jinja2 templates: templates/{lang}/stage{n}.j2."""
+    """Render subject+body from Jinja2 templates: templates/{lang}/stage{n}.j2.
+    Injects the localized money formatter: fmt(value, currency)."""
     if stage not in STAGES:
         raise ValueError(f"Unknown stage {stage}")
     if language not in LANGUAGES:
         raise ValueError(f"Unknown language {language!r}")
-    ctx = {**ctx, "stage_name": STAGES[stage]["name"], "days_overdue": ctx.get("days_overdue", 0)}
+    ctx = {**ctx, "stage_name": STAGES[stage]["name"], "days_overdue": ctx.get("days_overdue", 0),
+           "fmt": lambda value, cur: money.format_money(value, cur, language)}
     text = _env.get_template(f"{language}/stage{stage}.j2").render(**ctx)
     subject, _, body = text.partition("\n")
     return subject.removeprefix("SUBJECT: ").strip(), body.strip()
@@ -155,29 +157,33 @@ def payment_link(invoice_number: str) -> str:
 
 def letter_ctx(conn, inv: dict, late_fee_percent: float = 0.0, stage: int = 1) -> dict:
     """Template context for one invoice's letter (shared by build_letters
-    and the preview endpoint)."""
+    and the preview endpoint). Amounts are raw numbers; render() injects the
+    language-aware fmt() helper used by the templates."""
     s = db.get_settings(conn)
     items = db.get_items(conn, inv["id"])
     owed = db.outstanding(inv)  # partial payments: chase the remainder
+    language = inv.get("language") or "uk"
+    paid = inv["amount_paid"] or 0.0
+    fee = owed * late_fee_percent / 100
     return {
         "client_name": inv["client_name"],
         "company_name": s["company_name"] or "Payment Chaser",
         "company_iban": s["company_iban"],
         "company_logo": s["company_logo"],
         "invoice_number": inv["number"],
-        "amount": f"{owed:.2f}",
-        "amount_paid": f"{inv['amount_paid'] or 0:.2f}",
+        "amount": owed,
+        "amount_paid": paid,
         "currency": inv["currency"],
         "items": [
             {"item": it["item"], "qty": f"{it['qty']:g}",
-             "price": f"{it['price']:.2f}", "total": f"{it['qty'] * it['price']:.2f}"}
+             "price": it["price"], "total": it["qty"] * it["price"]}
             for it in items
         ],
         "days_overdue": days_overdue(inv["due_date"], date.today()),
         "due_date": inv["due_date"],
         "payment_link": payment_link(inv["number"]),
         "late_fee_line": (
-            f"Late fee ({late_fee_percent}%): {owed * late_fee_percent / 100:.2f} {inv['currency']}"
+            f"Late fee ({late_fee_percent}%): {money.format_money(fee, inv['currency'], language)}"
             if stage == 4 and late_fee_percent > 0 else ""
         ),
     }

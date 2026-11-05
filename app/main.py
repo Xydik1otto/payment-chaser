@@ -318,7 +318,7 @@ button.secondary{{background:#78716c}}</style></head><body>
 @app.get("/api/invoices/{invoice_id}/pdf")
 def invoice_pdf(invoice_id: int, conn=Conn):
     row = conn.execute(
-        "SELECT i.*, c.name AS client_name, c.email AS client_email "
+        "SELECT i.*, c.name AS client_name, c.email AS client_email, c.language "
         "FROM invoices i JOIN clients c ON c.id = i.client_id WHERE i.id = ?",
         (invoice_id,),
     ).fetchone()
@@ -328,7 +328,8 @@ def invoice_pdf(invoice_id: int, conn=Conn):
     seller = {"name": s["company_name"], "address": s["company_address"],
               "email": s["company_email"], "iban": s["company_iban"],
               "logo": s["company_logo"]}
-    data = pdf.render_pdf(dict(row), {"name": row["client_name"], "email": row["client_email"]},
+    data = pdf.render_pdf(dict(row), {"name": row["client_name"], "email": row["client_email"],
+                                      "language": row["language"]},
                           seller=seller)
     return Response(
         content=data,

@@ -4,11 +4,11 @@ SUBJECT: URGENT: invoice {{ invoice_number }} is {{ days_overdue }} days overdue
 {% endif %}
 Hi {{ client_name }}!
 
-Invoice {{ invoice_number }} for {{ amount }} {{ currency }}
+Invoice {{ invoice_number }} for {{ fmt(amount, currency) }}
 remains unpaid {{ days_overdue }} days past its due date ({{ due_date }}).
 {% if items %}
 Invoice line items:
-{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ fmt(it.price, currency) }} = {{ fmt(it.total, currency) }}
 {% endfor %}
 {% endif %}
 

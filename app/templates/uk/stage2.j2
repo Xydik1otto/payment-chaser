@@ -4,11 +4,11 @@ SUBJECT: Рахунок {{ invoice_number }} — прострочено на {{ 
 {% endif %}
 Вітаємо, {{ client_name }}!
 
-Рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
+Рахунок {{ invoice_number }} на суму {{ fmt(amount, currency) }}
 прострочено на {{ days_overdue }} дн. (термін оплати: {{ due_date }}).
 {% if items %}
 Позиції рахунку:
-{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ fmt(it.price, currency) }} = {{ fmt(it.total, currency) }}
 {% endfor %}
 {% endif %}
 

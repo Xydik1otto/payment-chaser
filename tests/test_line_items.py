@@ -91,8 +91,8 @@ def test_letters_include_line_items(client):
     client.post("/api/engine/run", json={"today": TODAY.isoformat()})
     ob = client.get("/api/outbox").json()[0]
     assert "Позиції рахунку:" in ob["body"]
-    assert "Розробка лендінгу — 1 × 800.00 = 800.00" in ob["body"]
-    assert "Підтримка (год) — 2 × 350.00 = 700.00" in ob["body"]
+    assert "Розробка лендінгу — 1 × 800,00 ₴ = 800,00 ₴" in ob["body"]
+    assert "Підтримка (год) — 2 × 350,00 ₴ = 700,00 ₴" in ob["body"]
 
 
 def test_letter_without_items_has_no_items_block(client):

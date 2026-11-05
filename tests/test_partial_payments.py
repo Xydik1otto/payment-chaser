@@ -81,7 +81,7 @@ def test_letter_chases_remainder_after_partial_payment(client):
     client.post(f"/api/invoices/{inv}/payment", json={"amount": 400.0})
     client.post("/api/engine/run", json={"today": TODAY.isoformat()})
     ob = client.get("/api/outbox").json()[0]
-    assert "600.00" in ob["body"]  # the letter asks for the outstanding part
+    assert "600,00 ₴" in ob["body"]  # the letter asks for the outstanding part
 
 
 def test_migration_old_db_gets_amount_paid_and_partial(tmp_path, monkeypatch):

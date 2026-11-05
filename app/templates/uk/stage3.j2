@@ -4,11 +4,11 @@ SUBJECT: ТЕРМІНОВО: рахунок {{ invoice_number }} простро�
 {% endif %}
 {{ client_name }}, вітаємо!
 
-Рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
+Рахунок {{ invoice_number }} на суму {{ fmt(amount, currency) }}
 залишається неоплаченим вже {{ days_overdue }} дн. (термін оплати: {{ due_date }}).
 {% if items %}
 Позиції рахунку:
-{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ fmt(it.price, currency) }} = {{ fmt(it.total, currency) }}
 {% endfor %}
 {% endif %}
 

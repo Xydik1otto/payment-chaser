@@ -4,11 +4,11 @@ SUBJECT: Останнє попередження: рахунок {{ invoice_numb
 {% endif %}
 {{ client_name }}, вітаємо!
 
-Рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
+Рахунок {{ invoice_number }} на суму {{ fmt(amount, currency) }}
 не оплачений {{ days_overdue }} дн. (термін оплати: {{ due_date }}).
 {% if items %}
 Позиції рахунку:
-{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ fmt(it.price, currency) }} = {{ fmt(it.total, currency) }}
 {% endfor %}
 {% endif %}
 Це останнє попередження перед передачею справи на стягнення.

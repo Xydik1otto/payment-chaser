@@ -1,14 +1,14 @@
-SUBJECT: Нагадування: рахунок {{ invoice_number }} на {{ amount }} {{ currency }}
+SUBJECT: Нагадування: рахунок {{ invoice_number }} на {{ fmt(amount, currency) }}
 {% if company_logo %}
 {{ company_logo }}
 {% endif %}
 Вітаємо, {{ client_name }}!
 
-Нагадуємо, що рахунок {{ invoice_number }} на суму {{ amount }} {{ currency }}
+Нагадуємо, що рахунок {{ invoice_number }} на суму {{ fmt(amount, currency) }}
 був виставлений з терміном оплати {{ due_date }}.
 {% if items %}
 Позиції рахунку:
-{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ fmt(it.price, currency) }} = {{ fmt(it.total, currency) }}
 {% endfor %}
 {% endif %}
 

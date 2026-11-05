@@ -1,14 +1,14 @@
-SUBJECT: Friendly reminder: invoice {{ invoice_number }} for {{ amount }} {{ currency }}
+SUBJECT: Friendly reminder: invoice {{ invoice_number }} for {{ fmt(amount, currency) }}
 {% if company_logo %}
 {{ company_logo }}
 {% endif %}
 Hi {{ client_name }}!
 
-Just a friendly reminder that invoice {{ invoice_number }} for {{ amount }} {{ currency }}
+Just a friendly reminder that invoice {{ invoice_number }} for {{ fmt(amount, currency) }}
 was issued with payment due on {{ due_date }}.
 {% if items %}
 Invoice line items:
-{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ fmt(it.price, currency) }} = {{ fmt(it.total, currency) }}
 {% endfor %}
 {% endif %}
 

@@ -37,13 +37,14 @@ def test_preview_contains_items_and_outstanding(client):
         "issued_date": "2026-10-01",
         "due_date": (TODAY - timedelta(days=2)).isoformat(),
         "items": [{"item": "Design", "qty": 1, "price": 900.0}],
+        "currency": "USD",
     }).json()["id"]
     client.patch(f"/api/invoices/{inv}", json={"status": "sent"})
     client.post(f"/api/invoices/{inv}/payment", json={"amount": 400.0})
     html = client.get(f"/api/invoices/{inv}/preview").text
     assert "Invoice line items:" in html
-    assert "Design — 1 × 900.00 = 900.00" in html
-    assert "500.00" in html  # outstanding amount in the body
+    assert "Design — 1 × $900.00 = $900.00" in html
+    assert "$500.00" in html  # outstanding amount in the body
 
 
 def test_preview_sends_nothing(client):

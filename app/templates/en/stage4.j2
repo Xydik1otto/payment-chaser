@@ -4,11 +4,11 @@ SUBJECT: Final notice: invoice {{ invoice_number }} — {{ days_overdue }} days 
 {% endif %}
 Hi {{ client_name }}!
 
-Invoice {{ invoice_number }} for {{ amount }} {{ currency }}
+Invoice {{ invoice_number }} for {{ fmt(amount, currency) }}
 has been unpaid for {{ days_overdue }} days (payment due: {{ due_date }}).
 {% if items %}
 Invoice line items:
-{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ it.price }} = {{ it.total }}
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ fmt(it.price, currency) }} = {{ fmt(it.total, currency) }}
 {% endfor %}
 {% endif %}
 This is a final notice before the matter is handed to collections.

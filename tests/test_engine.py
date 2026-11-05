@@ -147,29 +147,29 @@ def test_scheduler_mixed_queue(client):
 # ---------------------------------------------------------------- templates
 
 
-def _ctx(client_name="ТОВ Рога і Копита", number="INV-001", amount="1500.00",
+def _ctx(client_name="ТОВ Рога і Копита", number="INV-001", amount=1500.0,
          currency="UAH", days=7, due="2026-10-29"):
     return {"client_name": client_name, "company_name": "ФОП Тест", "invoice_number": number,
             "amount": amount, "currency": currency, "days_overdue": days, "due_date": due,
-            "late_fee_line": ""}
+            "items": [], "late_fee_line": ""}
 
 
 def test_template_stage1_polite_uk():
     subject, body = eng.render(1, "uk", _ctx(days=1))
-    assert "INV-001" in subject and "1500.00 UAH" in subject
+    assert "INV-001" in subject and "1 500,00 ₴" in subject
     assert "Нагадуємо" in body and "2026-10-29" in body and "проігноруйте" in body
 
 
 def test_template_stage2_reminder_en():
     subject, body = eng.render(2, "en", _ctx())
     assert "7 days overdue" in subject
-    assert "1500.00" in body and "7 days overdue" in body
+    assert "₴1,500.00" in body and "7 days overdue" in body
 
 
 def test_template_stage3_firm_uk():
     subject, body = eng.render(3, "uk", _ctx(days=14))
     assert "14 дн." in subject and "ТЕРМІНОВО" in subject
-    assert "1500.00" in body and "14 дн." in body and "3 робочих днів" in body
+    assert "1 500,00" in body and "14 дн." in body and "3 робочих днів" in body
 
 
 def test_template_stage4_final_with_late_fee():
@@ -177,7 +177,7 @@ def test_template_stage4_final_with_late_fee():
     ctx["late_fee_line"] = "Late fee (5%): 75.00 UAH"
     subject, body = eng.render(4, "en", ctx)
     assert "Final notice" in subject and "30 days overdue" in subject
-    assert "1500.00" in body and "75.00 UAH" in body
+    assert "₴1,500.00" in body and "75.00 UAH" in body
     assert "collections" in body
 
 
@@ -206,6 +206,6 @@ def test_letters_carry_correct_variables(client):
     # 7 days overdue, no letters sent yet -> first chain stage fires, with real data
     assert l.stage == 1 and l.language == "en" and l.days_overdue == 7
     assert l.amount == 2000.0 and l.currency == "USD"
-    assert "2000.00 USD" in l.subject
-    assert "2026-10-29" in l.body and "2000.00 USD" in l.body  # stage 1 = polite, no days mentioned
+    assert "$2,000.00" in l.subject
+    assert "2026-10-29" in l.body and "$2,000.00" in l.body  # stage 1 = polite, no days mentioned
     assert l.to_email == "pay@acme.com"
