@@ -39,6 +39,9 @@ app = FastAPI(title="Payment Chaser", version="0.4.0", lifespan=lifespan,
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
+from fastapi.staticfiles import StaticFiles  # i18n.js and other static assets
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 
 def conn_dep():
     """FastAPI dependency: yields a sqlite3 connection, commits on success."""
