@@ -200,6 +200,14 @@ systemctl list-timers payment-chaser.timer   # перевірити
 Python 3.10+, FastAPI, SQLite (stdlib, без ORM), Jinja2, reportlab,
 HTML + vanilla JS без build-кроку.
 
+## Contributing
+
+Баг-репорти й PR вітаються — див. [CONTRIBUTING.md](CONTRIBUTING.md).
+Питання безпеки (зокрема SMTP-credentials) — [SECURITY.md](SECURITY.md).
+
+Рекомендовані GitHub topics: `invoicing` · `freelancing` · `payments` ·
+`fastapi` · `reminders`.
+
 ## Ліцензія
 
 MIT — див. [LICENSE](LICENSE).
