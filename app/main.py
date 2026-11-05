@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
         pass  # daemon thread dies with the process; nothing to join
 
 
-app = FastAPI(title="Payment Chaser", version="0.4.0", lifespan=lifespan,
+app = FastAPI(title="Payment Chaser", version="1.0.0", lifespan=lifespan,
               description=DESCRIPTION)
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")

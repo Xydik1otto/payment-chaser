@@ -5,7 +5,8 @@ import io
 import json
 
 from fastapi import HTTPException
-from fastapi.responses import Response
+
+from .db import now_iso
 
 
 def export_all(conn) -> dict:
@@ -19,7 +20,7 @@ def export_all(conn) -> dict:
                 "WHERE invoice_id = ? ORDER BY position, id", (inv["id"],))
         ]
     return {
-        "exported_at": __import__("app.db", fromlist=["now_iso"]).now_iso(),
+        "exported_at": now_iso(),
         "app": "payment-chaser",
         "clients": clients,
         "invoices": invoices,
