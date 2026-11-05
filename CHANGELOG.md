@@ -4,6 +4,35 @@
 Формат — [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 версіонування — [SemVer](https://semver.org/lang/uk/).
 
+## [1.0.0] — 2026-11-05
+
+### Added
+- **SMTP setup wizard**: host/port/user/password у налаштуваннях БД
+  (env лишається як fallback для серверів), кнопка «Перевірити»
+  (`POST /api/settings/smtp/test` — з'єднання без відправки), пароль
+  write-only. Картка SMTP в UI.
+- **3 шаблони PDF-інвойсів** (`minimal` / `classic` / `detailed`) —
+  `?template=` на `GET /api/invoices/{id}/pdf`; detailed додає статус
+  оплати (сплачено/залишок) і реквізити; вибір шаблону в UI.
+- **Мультивалютність + звіт у базовій валюті**: `app/fx.py` тягне денні
+  курси ECB (кеш у БД; офлайн → кеш → вбудований резерв), `app/report.py`
+  рахує aging-бакети й розбивку по валютах у базовій валюті;
+  `GET /api/report?base=&refresh=`; налаштування `base_currency`.
+- **Клієнтські payment terms** net 7/14/30: колонка `clients.payment_terms`
+  (+ міграція старих БД), `PATCH /api/clients/{id}`, `due_date` обчислюється
+  автоматично (`issued_date + N` днів), перевизначення на рівні інвойсу.
+- **i18n UI UA/EN**: словники в `app/static/i18n.js`, авто-детект мови
+  браузера, збереження вибору, перемикач UA/EN. Без російської.
+- **First-run демо**: `POST /api/demo/load` — opt-in, 2 клієнти + 3 інвойси,
+  відмовляється, якщо дані вже є.
+- **Експорт даних**: `GET /api/export` (уся база в JSON) і
+  `GET /api/export/invoices.csv` (UTF-8 BOM для Excel); видалення інвойсів
+  (каскад) і клієнтів (409, поки є інвойси) з підтвердженнями в UI.
+- **A11y**: aria-labels, sr-only, skip-link, focus-visible, aria-live.
+- **Packaging**: `pyproject.toml` (PEP 621), консольна команда
+  `payment-chaser`, `INSTALL.md`, `start.bat`.
+- `README.en.md` (англійська версія README).
+
 ## [0.4.0] — 2026-11-05
 
 ### Added
