@@ -56,7 +56,7 @@ def test_engine_run_sends_via_smtp_when_configured(client, monkeypatch):
     monkeypatch.setenv("SMTP_HOST", "smtp.gmail.com")
     monkeypatch.setenv("SMTP_FROM", "me@gmail.com")
     sent = []
-    monkeypatch.setattr(mailer, "send_email", lambda letter: sent.append(letter) or True)
+    monkeypatch.setattr(mailer, "send_email", lambda letter, conn: sent.append(letter) or True)
     cid = make_client(client, name="Acme", email="pay@acme.com", language="en")
     make_invoice(client, cid, number="INV-200", due_date=(TODAY - timedelta(days=2)).isoformat())
     r = client.post("/api/engine/run", json={"today": TODAY.isoformat()})

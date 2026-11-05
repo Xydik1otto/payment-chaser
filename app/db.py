@@ -180,7 +180,9 @@ def add_items(conn, invoice_id: int, items: list[dict]) -> None:
 # ---------------------------------------------------------------- settings
 
 SETTING_KEYS = ("company_name", "company_address", "company_email",
-                "company_iban", "company_logo")
+                "company_iban", "company_logo",
+                "smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from",
+                "base_currency")
 
 # env fallbacks used when a key is not stored in the DB
 _SETTING_ENV_DEFAULTS = {
@@ -188,6 +190,12 @@ _SETTING_ENV_DEFAULTS = {
     "company_address": "CHASER_COMPANY_ADDRESS",
     "company_email": "CHASER_COMPANY_EMAIL",
     "company_iban": "CHASER_COMPANY_IBAN",
+    "smtp_host": "SMTP_HOST",
+    "smtp_port": "SMTP_PORT",
+    "smtp_user": "SMTP_USER",
+    "smtp_pass": "SMTP_PASS",
+    "smtp_from": "SMTP_FROM",
+    "base_currency": "CHASER_BASE_CURRENCY",
 }
 
 

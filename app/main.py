@@ -377,7 +377,12 @@ table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #ddd;padding
 
 @app.get("/api/settings")
 def get_settings(conn=Conn):
-    return db.get_settings(conn)
+    """Company + SMTP settings. The SMTP password is never returned —
+    only a boolean flag that it is set (v1.0.0 setup wizard)."""
+    s = db.get_settings(conn)
+    out = {k: s[k] for k in db.SETTING_KEYS if not k.endswith("_pass")}
+    out["smtp_pass_set"] = bool(s.get("smtp_pass"))
+    return out
 
 
 class SettingsIn(BaseModel):
@@ -386,6 +391,11 @@ class SettingsIn(BaseModel):
     company_email: str | None = None
     company_iban: str | None = None
     company_logo: str | None = None
+    smtp_host: str | None = None
+    smtp_port: str | None = None
+    smtp_user: str | None = None
+    smtp_pass: str | None = None   # write-only: stored, never returned
+    smtp_from: str | None = None
 
 
 @app.patch("/api/settings")
@@ -393,15 +403,46 @@ def patch_settings(body: SettingsIn, conn=Conn):
     values = {k: v for k, v in body.model_dump().items() if v is not None}
     if not values:
         raise HTTPException(422, "no settings to update")
+    # the password is write-only: a non-empty value replaces it, empty/None
+    # keeps the stored one (the UI sends it only when the user retypes it)
+    if values.get("smtp_pass", None) == "":
+        values.pop("smtp_pass", None)
+    if values.get("smtp_port", "") == "":
+        values.pop("smtp_port", None)
     db.set_settings(conn, values)
-    return db.get_settings(conn)
+    return get_settings(conn)
+
+
+class SmtpTestIn(BaseModel):
+    """Overrides for testing an UNSAVED config (the wizard's Test button);
+    empty body -> test the stored/effective config."""
+    host: str | None = None
+    port: int | None = None
+    user: str | None = None
+    password: str | None = None
+    sender: str | None = None
+
+
+@app.post("/api/settings/smtp/test")
+def smtp_test(body: SmtpTestIn | None = None, conn=Conn):
+    """Dial the SMTP server and (optionally) log in — nothing is sent.
+    Tests the posted values first, falling back to saved settings."""
+    cfg = mailer.smtp_settings(conn)
+    b = body or SmtpTestIn()
+    host = (b.host if b.host not in (None, "") else cfg["host"]).strip()
+    port = b.port if b.port is not None else (int(cfg["port"]) if cfg["port"] else 587)
+    user = b.user if b.user is not None else cfg["user"]
+    password = b.password if b.password else cfg["password"]
+    sender = b.sender if b.sender is not None else cfg["sender"]
+    ok, message = mailer.test_connection(host, port, user, password, sender)
+    return {"ok": ok, "message": message}
 
 
 @app.get("/api/dashboard")
 def dashboard(conn=Conn):
     invoices = [dict(r) for r in conn.execute("SELECT * FROM invoices")]
     stats = reminder_engine.compute_buckets(invoices, date.today())
-    stats["smtp_configured"] = mailer.smtp_configured()
+    stats["smtp_configured"] = mailer.smtp_configured(conn)
     return stats
 
 

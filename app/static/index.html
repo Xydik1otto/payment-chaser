@@ -77,6 +77,19 @@ pre { white-space:pre-wrap; background:#f5f5f4; padding:10px; border-radius:6px;
   </div>
 
   <div class="card">
+    <h3>SMTP — автоматична відправка</h3>
+    <input id="smtpHost" placeholder="host, напр. smtp.gmail.com" style="width:200px">
+    <input id="smtpPort" type="number" value="587" style="width:80px" title="порт">
+    <input id="smtpUser" placeholder="логін" style="width:160px">
+    <input id="smtpPass" type="password" placeholder="пароль (порожньо = не змінювати)" style="width:220px">
+    <input id="smtpFrom" placeholder="від кого, напр. you@gmail.com" style="width:190px">
+    <button onclick="saveSmtp()">Зберегти SMTP</button>
+    <button class="secondary" onclick="testSmtp()">Перевірити</button>
+    <span id="smtpTestNote" class="muted" aria-live="polite"></span>
+    <div class="muted">Без SMTP листи чекають у outbox — копіюйте вручну.</div>
+  </div>
+
+  <div class="card">
     <h3>Черга листів (outbox)</h3>
     <div id="outboxBox" class="muted">порожньо</div>
   </div>
@@ -198,6 +211,31 @@ async function loadSettings() {
   sName.value = s.company_name || ''; sLogo.value = s.company_logo || '';
   sIban.value = s.company_iban || ''; sEmail.value = s.company_email || '';
   sAddress.value = s.company_address || '';
+  smtpHost.value = s.smtp_host || ''; smtpPort.value = s.smtp_port || '587';
+  smtpUser.value = s.smtp_user || ''; smtpFrom.value = s.smtp_from || '';
+  smtpPass.value = ''; smtpPass.placeholder = s.smtp_pass_set
+    ? 'пароль збережено — залиште порожнім' : 'пароль (залиште порожнім, щоб не змінювати)';
+}
+
+async function saveSmtp() {
+  const body = { smtp_host: smtpHost.value, smtp_port: smtpPort.value,
+                 smtp_user: smtpUser.value, smtp_from: smtpFrom.value };
+  if (smtpPass.value) body.smtp_pass = smtpPass.value;  // empty = keep stored
+  await api('/api/settings', { method: 'PATCH', body: JSON.stringify(body) });
+  smtpPass.value = '';
+  document.getElementById('smtpTestNote').textContent = '✓ SMTP збережено';
+  await loadDashboard(); await loadSettings();
+}
+
+async function testSmtp() {
+  const note = document.getElementById('smtpTestNote');
+  note.textContent = '…перевірка…';
+  // test exactly what is typed (before saving); fall back to saved values
+  const body = { host: smtpHost.value, port: +smtpPort.value || null,
+                 user: smtpUser.value, sender: smtpFrom.value };
+  if (smtpPass.value) body.password = smtpPass.value;
+  const r = await api('/api/settings/smtp/test', { method: 'POST', body: JSON.stringify(body) });
+  note.textContent = (r.ok ? '✓ ' : '✗ ') + r.message;
 }
 
 async function saveSettings() {
