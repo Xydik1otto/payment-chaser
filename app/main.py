@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response, HTMLResponse
 from pydantic import BaseModel
 
-from . import db, mailer, pdf, reminder_engine, scheduler, stats
+from . import db, mailer, pdf, reminder_engine, scheduler, stats, summary
 from .reminder_engine import Letter
 
 DESCRIPTION = """API for chasing overdue invoice payments: reminder chain
@@ -280,6 +280,20 @@ def engine_run(body: EngineRunIn | None = None, conn=Conn):
     return {"run_date": today.isoformat(), "letters_sent": len(delivered), "letters": delivered}
 
 
+# ---------------------------------------------------------------- weekly summary
+
+
+@app.post("/api/summary/weekly")
+def weekly_summary(body: EngineRunIn | None = None, conn=Conn):
+    """Owner digest for the last 7 days: new overdue, paid this week.
+    Lands in the outbox for CHASER_OWNER_EMAIL."""
+    today = date.fromisoformat(body.today) if body and body.today else date.today()
+    try:
+        return summary.send_weekly_summary(conn, today)
+    except RuntimeError as exc:
+        raise HTTPException(422, str(exc))
+
+
 @app.get("/api/reminders")
 def reminder_history(conn=Conn):
     sql = ("SELECT r.*, i.number AS invoice_number FROM reminders r "
@@ -291,7 +305,7 @@ def reminder_history(conn=Conn):
 def outbox(conn=Conn):
     rows = conn.execute(
         "SELECT o.*, i.number AS invoice_number FROM outbox o "
-        "JOIN invoices i ON i.id = o.invoice_id ORDER BY o.id DESC"
+        "LEFT JOIN invoices i ON i.id = o.invoice_id ORDER BY o.id DESC"
     ).fetchall()
     return [dict(r) for r in rows]
 

@@ -34,6 +34,7 @@ pre { white-space:pre-wrap; background:#f5f5f4; padding:10px; border-radius:6px;
     <div class="stats" id="stats"></div>
     <div style="margin-top:12px">
       <button onclick="runEngine()">▶ Запустити движок нагадувань</button>
+      <button class="secondary" onclick="sendWeekly()">✉ Щотижневе зведення</button>
       <span id="smtpNote" class="muted"></span>
     </div>
     <div id="runResult"></div>
@@ -158,6 +159,13 @@ async function copyMail(id, btn) {
   });
   btn.textContent = '✓ скопійовано'; btn.disabled = true;
   await api(`/api/outbox/${id}/mark-copied`, { method: 'POST' });
+}
+
+async function sendWeekly() {
+  const d = await api('/api/summary/weekly', { method: 'POST' });
+  document.getElementById('runResult').innerHTML =
+    `<pre>Зведення відправлено на ${d.delivered_to}: ${d.new_overdue.length} нових прострочених, ${d.paid_this_week.length} оплачених</pre>`;
+  await loadOutbox();
 }
 
 async function setPause(id, paused) {

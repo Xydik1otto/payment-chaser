@@ -8,7 +8,7 @@ import threading
 import traceback
 from datetime import date
 
-from . import db, mailer, reminder_engine
+from . import db, mailer, reminder_engine, summary
 
 
 def interval_seconds() -> int:
@@ -20,7 +20,8 @@ def enabled() -> bool:
 
 
 def run_once() -> int:
-    """One engine pass; returns the number of letters sent."""
+    """One engine pass; returns the number of letters sent.
+    On Mondays it also drops the weekly owner summary into the outbox."""
     conn = db.get_conn()
     try:
         letters = reminder_engine.build_letters(
@@ -29,6 +30,11 @@ def run_once() -> int:
         )
         for letter in letters:
             mailer.deliver(conn, letter)
+        if date.today().weekday() == 0:  # Monday: weekly owner digest
+            try:
+                summary.send_weekly_summary(conn, date.today())
+            except RuntimeError:
+                pass  # CHASER_OWNER_EMAIL not configured — skip quietly
         conn.commit()
     finally:
         conn.close()
