@@ -79,6 +79,15 @@ and escalated mechanically, on schedule, politely — you only press Copy.
     (CSV); confirmation dialogs before deletions.
 22. **Accessibility** — aria-labels, screen-reader labels, skip link,
     keyboard-visible focus, live status regions.
+23. **Recurring invoices** — monthly auto-creation from profiles
+    (client + base number + amount + day of month); number `BASE-YYYY-MM`,
+    idempotent within a month; `POST /api/recurring/run`.
+24. **Client portal** — read-only `/portal/{token}` page with the client's
+    own invoice statuses; stable unguessable link, no actions.
+25. **Print without SMTP** — a print-friendly page for every outbox letter
+    (Print button, `window.print()`); nothing is sent or marked.
+26. **German templates (de)** — third language of the reminder chain with
+    localized amounts (`1.234,56 €`). **No Russian localization** (owner's decision).
 
 ## How it works
 

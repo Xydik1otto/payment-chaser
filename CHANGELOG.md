@@ -6,6 +6,23 @@
 
 ## [Unreleased]
 
+### Added
+- **Recurring-рахунки**: щомісячне автостворення інвойсів з профілів
+  (`POST /api/recurring`, `POST /api/recurring/run`); номер `BASE-YYYY-MM`,
+  ідемпотентно в межах місяця, дня 29–31 clamp на останній день короткого
+  місяця; неактивні профілі пропускаються.
+- **Клієнтський портал**: read-only сторінка `/portal/{token}` — статуси
+  й залишки інвойсів клієнта (HTML + JSON `GET /api/portal/{token}`);
+  стабільний unguessable-токен, виданий один раз (`POST
+  /api/clients/{id}/portal-link`); кнопка «Портал клієнта» в UI.
+- **Друк листа без SMTP**: print-сторінка `GET /api/outbox/{id}/print`
+  з автозапуском `window.print()`; нічого не відправляє, не зберігає
+  і не позначає; кнопка «Друк» у черзі outbox (uk/en i18n).
+- **Німецькі шаблони (de)**: третя мова ланцюжка нагадувань —
+  `app/templates/de/stage{1..4}.j2`, локальний формат сум `1.234,56 €`,
+  `language: "de"` приймається в API клієнтів. Російська локалізація
+  не додається (рішення власника); `render(…, "ru")` як і раніше відхиляється.
+
 ### Removed
 - Monetization scaffolding: проєкт тепер 100% безкоштовний open-source.
   Видалено `.github/FUNDING.yml` (GitHub Sponsors); з PLAN.md прибрано
