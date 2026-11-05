@@ -2,7 +2,7 @@
 
 ![tests](https://github.com/bigpi/payment-chaser/actions/workflows/tests.yml/badge.svg)
 ![license](https://img.shields.io/badge/license-MIT-green)
-![version](https://img.shields.io/badge/version-v0.1.0--alpha-orange)
+![version](https://img.shields.io/badge/version-v0.3.0-orange)
 
 «Дебіторка, яка сама себе вибиває». Нагадування перестають бути особистою
 незручністю: система пише ввічливо і послідовно, ескалація — за розкладом,
@@ -14,7 +14,7 @@
 тому не пишуть їх узагалі. Дебторка — найболючіша рутина solo-бізнесу:
 рахунок оплачений, а гроші «десь йдуть», і нагадати про нього незручно.
 
-## Що вміє Alpha (v0.1.0-alpha)
+## Що вміє v0.3.0
 
 1. **Клієнти та інвойси** (number, client, amount, currency, issued_date,
    due_date, status: draft / sent / overdue / paid).
@@ -41,6 +41,18 @@
 8. **Effectiveness-статистика** — сторінка `/stats` і
    `GET /api/stats/effectiveness`: скільки листів на кожну стадію,
    скільки оплат сталося після stage 1/2/3/4.
+9. **Payment links у листах** — `CHASER_PAYMENT_LINK_TEMPLATE`
+   (напр. `https://buy.stripe.com/test_{invoice_number}`) → рядок
+   «Оплатити онлайн / Pay online» у кожному листі.
+10. **Налаштування компанії** — назва, адреса, email, IBAN, логотип-текст:
+    `PATCH /api/settings` або картка в UI; використовуються у шаблонах
+    листів і в шапці PDF.
+11. **Пауза/стоп chaser на інвойс** — кнопка «Пауза» з обов'язковою
+    причиною (`POST /api/invoices/{id}/pause`); зупинений інвойс не
+    отримує листів, але aging-дашборд його враховує.
+12. **Щотижневе зведення власнику** — `POST /api/summary/weekly` або
+    автоматично щопонеділка зі scheduler: нові прострочені та оплачені
+    за тиждень, у outbox для `CHASER_OWNER_EMAIL`.
 
 ## Як це працює
 
@@ -83,6 +95,8 @@ export SMTP_USER=you@gmail.com SMTP_PASS="пароль додатку (App Passw
 export CHASER_COMPANY_NAME="ФОП Ваше Ім'я"     # підпис у листах + шапка PDF
 export CHASER_LATE_FEE_PERCENT=5               # рядок late fee у final notice
 export CHASER_SCHEDULER_SECONDS=3600           # інтервал in-process scheduler
+export CHASER_PAYMENT_LINK_TEMPLATE="https://buy.stripe.com/test_{invoice_number}"
+export CHASER_OWNER_EMAIL=you@gmail.com        # кому йде щотижневе зведення
 # DISABLE_SCHEDULER=1                          # вимкнути scheduler (тоді cron)
 ```
 
