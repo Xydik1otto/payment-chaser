@@ -316,7 +316,9 @@ button.secondary{{background:#78716c}}</style></head><body>
 
 
 @app.get("/api/invoices/{invoice_id}/pdf")
-def invoice_pdf(invoice_id: int, conn=Conn):
+def invoice_pdf(invoice_id: int, template: str = "classic", conn=Conn):
+    if template not in pdf.TEMPLATES:
+        raise HTTPException(422, f"template must be one of {list(pdf.TEMPLATES)}")
     row = conn.execute(
         "SELECT i.*, c.name AS client_name, c.email AS client_email, c.language "
         "FROM invoices i JOIN clients c ON c.id = i.client_id WHERE i.id = ?",
@@ -330,7 +332,7 @@ def invoice_pdf(invoice_id: int, conn=Conn):
               "logo": s["company_logo"]}
     data = pdf.render_pdf(dict(row), {"name": row["client_name"], "email": row["client_email"],
                                       "language": row["language"]},
-                          seller=seller)
+                          seller=seller, template=template)
     return Response(
         content=data,
         media_type="application/pdf",

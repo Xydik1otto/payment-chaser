@@ -63,6 +63,7 @@ pre { white-space:pre-wrap; background:#f5f5f4; padding:10px; border-radius:6px;
   <div class="card">
     <h3>Рахунки</h3>
     <select id="fStatus" onchange="loadInvoices()"><option value="">— всі —</option><option>draft</option><option>sent</option><option>overdue</option><option>paid</option></select>
+    <select id="pdfTpl" title="PDF шаблон" aria-label="PDF шаблон"><option value="classic">classic</option><option value="minimal">minimal</option><option value="detailed">detailed</option></select>
     <table id="invTable"><thead><tr><th>Номер</th><th>Клієнт</th><th>Сума</th><th>Термін</th><th>Статус</th><th></th></tr></thead><tbody></tbody></table>
   </div>
 
@@ -152,7 +153,7 @@ async function loadInvoices() {
         ? `<button class="secondary" onclick="setPause(${r.id}, false)">Відновити</button>`
         : `<button class="secondary" onclick="setPause(${r.id}, true)">Пауза</button>`) : ''}` +
       `<a href="/api/invoices/${r.id}/preview" target="_blank">Прев'ю</a> ` +
-      `<a href="/api/invoices/${r.id}/pdf" target="_blank">PDF</a></td>`;
+      `<a href="/api/invoices/${r.id}/pdf?template=${pdfTpl.value}" target="_blank">PDF</a></td>`;
     tb.appendChild(tr);
   });
 }
