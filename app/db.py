@@ -25,8 +25,9 @@ CREATE TABLE IF NOT EXISTS invoices (
     currency TEXT NOT NULL DEFAULT 'UAH',
     issued_date TEXT NOT NULL,
     due_date TEXT NOT NULL,
+    amount_paid REAL NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'draft'
-        CHECK (status IN ('draft', 'sent', 'overdue', 'paid')),
+        CHECK (status IN ('draft', 'sent', 'overdue', 'partial', 'paid')),
     created_at TEXT NOT NULL
 );
 
@@ -98,6 +99,7 @@ _EXTRA_INVOICE_COLUMNS = {
     "paid_at": "TEXT",                                # when PATCH status -> paid
     "chaser_paused": "INTEGER NOT NULL DEFAULT 0",    # pause/stop chaser (v0.2.x)
     "pause_reason": "TEXT",                           # why the chaser was paused
+    "amount_paid": "REAL NOT NULL DEFAULT 0",         # partial payments (v0.4.0)
 }
 
 
@@ -107,6 +109,44 @@ def _migrate(conn: sqlite3.Connection) -> None:
     for col, ddl in _EXTRA_INVOICE_COLUMNS.items():
         if col not in existing:
             conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} {ddl}")
+    _migrate_partial_check(conn)
+
+
+def _migrate_partial_check(conn: sqlite3.Connection) -> None:
+    """Rebuild the invoices table when its CHECK constraint predates the
+    'partial' status (SQLite cannot ALTER a CHECK)."""
+    sql = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'invoices'"
+    ).fetchone()["sql"] or ""
+    if not sql or "partial" in sql:
+        return
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        conn.executescript("""
+            CREATE TABLE invoices_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                number TEXT NOT NULL UNIQUE,
+                client_id INTEGER NOT NULL REFERENCES clients(id),
+                amount REAL NOT NULL,
+                currency TEXT NOT NULL DEFAULT 'UAH',
+                issued_date TEXT NOT NULL,
+                due_date TEXT NOT NULL,
+                amount_paid REAL NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'draft'
+                    CHECK (status IN ('draft', 'sent', 'overdue', 'partial', 'paid')),
+                created_at TEXT NOT NULL
+            );
+            INSERT INTO invoices_new
+                (id, number, client_id, amount, currency, issued_date, due_date,
+                 amount_paid, status, created_at)
+            SELECT id, number, client_id, amount, currency, issued_date, due_date,
+                   COALESCE(amount_paid, 0), status, created_at
+            FROM invoices;
+            DROP TABLE invoices;
+            ALTER TABLE invoices_new RENAME TO invoices;
+        """)
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
 
 
 # ---------------------------------------------------------------- line items
@@ -121,6 +161,11 @@ def get_items(conn, invoice_id: int) -> list[dict]:
 
 def items_total(items: list[dict]) -> float:
     return round(sum(i["qty"] * i["price"] for i in items), 2)
+
+
+def outstanding(invoice: dict) -> float:
+    """Remaining balance: amount minus what was already paid (>= 0)."""
+    return round(max(invoice["amount"] - (invoice.get("amount_paid") or 0.0), 0.0), 2)
 
 
 def add_items(conn, invoice_id: int, items: list[dict]) -> None:

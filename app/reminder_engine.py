@@ -60,23 +60,28 @@ def aging_bucket(days: int) -> str | None:
 
 
 def compute_buckets(invoices: list[dict], today: date) -> dict:
-    """invoices: rows with due_date, amount, status. Only unpaid, past-due invoices count."""
+    """invoices: rows with due_date, amount, status, amount_paid. Only unpaid,
+    past-due invoices count; partial payments reduce the counted amount."""
     result = {name: {"count": 0, "amount": 0.0} for name, _, _ in BUCKETS}
     total_amount, total_count = 0.0, 0
     for inv in invoices:
         if inv["status"] in ("paid", "draft"):
+            continue
+        owed = db.outstanding(inv)
+        if owed <= 0:  # fully paid but not yet marked paid
             continue
         d = days_overdue(inv["due_date"], today)
         if d < 1:
             continue
         b = aging_bucket(d)
         result[b]["count"] += 1
-        result[b]["amount"] += inv["amount"]
+        result[b]["amount"] += owed
         total_count += 1
-        total_amount += inv["amount"]
+        total_amount += owed
     return {
         "overdue_count": total_count,
         "total_overdue_amount": round(total_amount, 2),
+        "total_outstanding_amount": round(total_amount, 2),
         "buckets": result,
     }
 
@@ -155,13 +160,15 @@ def build_letters(conn, today: date, late_fee_percent: float = 0.0) -> list[Lett
         d = days_overdue(inv["due_date"], today)
         s = db.get_settings(conn)
         items = db.get_items(conn, inv["id"])
+        owed = db.outstanding(inv)  # partial payments: chase the remainder
         ctx = {
             "client_name": inv["client_name"],
             "company_name": s["company_name"] or "Payment Chaser",
             "company_iban": s["company_iban"],
             "company_logo": s["company_logo"],
             "invoice_number": inv["number"],
-            "amount": f"{inv['amount']:.2f}",
+            "amount": f"{owed:.2f}",
+            "amount_paid": f"{inv['amount_paid'] or 0:.2f}",
             "currency": inv["currency"],
             "items": [
                 {"item": it["item"], "qty": f"{it['qty']:g}",
@@ -172,7 +179,7 @@ def build_letters(conn, today: date, late_fee_percent: float = 0.0) -> list[Lett
             "due_date": inv["due_date"],
             "payment_link": payment_link(inv["number"]),
             "late_fee_line": (
-                f"Late fee ({late_fee_percent}%): {inv['amount'] * late_fee_percent / 100:.2f} {inv['currency']}"
+                f"Late fee ({late_fee_percent}%): {owed * late_fee_percent / 100:.2f} {inv['currency']}"
                 if stage == 4 and late_fee_percent > 0 else ""
             ),
         }

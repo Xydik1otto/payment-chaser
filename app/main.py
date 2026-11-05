@@ -168,7 +168,72 @@ def invoice_detail(invoice_id: int, conn=Conn):
 
 
 class InvoicePatch(BaseModel):
-    status: str
+    status: str | None = None
+    amount_paid: float | None = None  # absolute paid-so-far (v0.4.0)
+
+
+class PaymentIn(BaseModel):
+    amount: float
+
+
+def _status_for_paid(current: str, amount: float, amount_paid: float) -> str:
+    """Auto-derive status from the paid share: >= amount -> paid,
+    partially paid -> partial, otherwise keep the current status."""
+    if amount_paid >= amount:
+        return "paid"
+    if amount_paid > 0:
+        return "partial"
+    return current
+
+
+@app.post("/api/invoices/{invoice_id}/payment")
+def register_payment(invoice_id: int, body: PaymentIn, conn=Conn):
+    """Register an incoming (partial) payment; status follows the balance."""
+    if body.amount <= 0:
+        raise HTTPException(422, "payment amount must be > 0")
+    row = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Invoice not found")
+    inv = dict(row)
+    amount_paid = round(inv["amount_paid"] + body.amount, 2)
+    status = _status_for_paid(inv["status"], inv["amount"], amount_paid)
+    conn.execute(
+        "UPDATE invoices SET amount_paid = ?, status = ?, "
+        "paid_at = CASE WHEN ? = 'paid' THEN ? ELSE paid_at END WHERE id = ?",
+        (amount_paid, status, status, db.now_iso(), invoice_id),
+    )
+    return {"ok": True, "id": invoice_id, "amount_paid": amount_paid,
+            "outstanding": db.outstanding({**inv, "amount_paid": amount_paid}),
+            "status": status}
+
+
+@app.patch("/api/invoices/{invoice_id}")
+def patch_invoice(invoice_id: int, body: InvoicePatch, conn=Conn):
+    if body.status is None and body.amount_paid is None:
+        raise HTTPException(422, "nothing to update: provide status or amount_paid")
+    if body.status is not None and body.status not in ("draft", "sent", "overdue", "partial", "paid"):
+        raise HTTPException(422, "status must be draft|sent|overdue|partial|paid")
+    if body.amount_paid is not None and body.amount_paid < 0:
+        raise HTTPException(422, "amount_paid must be >= 0")
+    row = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Invoice not found")
+    inv = dict(row)
+    status = body.status
+    if status is None:
+        amount_paid = round(body.amount_paid, 2)
+        status = _status_for_paid(inv["status"], inv["amount"], amount_paid)
+    else:
+        amount_paid = round(body.amount_paid if body.amount_paid is not None else inv["amount_paid"], 2)
+    cur = conn.execute(
+        "UPDATE invoices SET status = ?, amount_paid = ?, "
+        "paid_at = CASE WHEN ? = 'paid' THEN ? ELSE paid_at END "
+        "WHERE id = ?",
+        (status, amount_paid, status, db.now_iso(), invoice_id),
+    )
+    return {"ok": True, "id": invoice_id, "status": status,
+            "amount_paid": amount_paid,
+            "outstanding": db.outstanding({**inv, "amount_paid": amount_paid})}
 
 
 class PauseIn(BaseModel):

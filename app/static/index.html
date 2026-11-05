@@ -123,11 +123,13 @@ async function loadInvoices() {
   const rows = await api('/api/invoices' + p);
   const tb = document.querySelector('#invTable tbody'); tb.innerHTML = '';
   rows.forEach(r => {
-    const tr = document.createElement('tr');
-    if (r.status === 'overdue') tr.className = 'overdue';
-    tr.innerHTML = `<td>${r.number}</td><td>${r.client_name}</td><td>${r.amount.toFixed(2)} ${r.currency}</td><td>${r.due_date}</td>` +
-      `<td>${r.status}${r.chaser_paused ? ' <span class="muted" title="' + (r.pause_reason || '') + '">⏸ пауза</span>' : ''}</td>` +
-      `<td>${r.status !== 'paid' ? `<button class="ok" onclick="markPaid(${r.id})">Оплачено</button> ` : ''}` +
+  const tr = document.createElement('tr');
+  if (r.status === 'overdue') tr.className = 'overdue';
+  const outstanding = (r.amount - (r.amount_paid || 0)).toFixed(2);
+  tr.innerHTML = `<td>${r.number}</td><td>${r.client_name}</td><td>${r.amount.toFixed(2)} ${r.currency}${r.amount_paid > 0 ? ` <span class="muted">(оплачено ${r.amount_paid.toFixed(2)}, залишок ${outstanding})</span>` : ''}</td><td>${r.due_date}</td>` +
+    `<td>${r.status}${r.chaser_paused ? ' <span class="muted" title="' + (r.pause_reason || '') + '">⏸ пауза</span>' : ''}</td>` +
+    `<td>${r.status !== 'paid' ? `<button class="ok" onclick="markPaid(${r.id})">Оплачено</button> ` : ''}` +
+    `${r.status !== 'paid' ? `<button class="secondary" onclick="addPayment(${r.id})">＋ оплата</button> ` : ''}` +
       `${r.status !== 'paid' ? (r.chaser_paused
         ? `<button class="secondary" onclick="setPause(${r.id}, false)">Відновити</button>`
         : `<button class="secondary" onclick="setPause(${r.id}, true)">Пауза</button>`) : ''}` +
@@ -139,6 +141,13 @@ async function loadInvoices() {
 async function markPaid(id) {
   await api('/api/invoices/' + id, { method: 'PATCH', body: JSON.stringify({ status: 'paid' }) });
   await Promise.all([loadInvoices(), loadDashboard(), loadOutbox()]);
+}
+
+async function addPayment(id) {
+  const v = prompt('Сума отриманої оплати (часткова — теж ok):');
+  if (!v || !(parseFloat(v) > 0)) return;
+  await api(`/api/invoices/${id}/payment`, { method: 'POST', body: JSON.stringify({ amount: parseFloat(v) }) });
+  await Promise.all([loadInvoices(), loadDashboard()]);
 }
 
 async function loadOutbox() {
