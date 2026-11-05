@@ -255,7 +255,7 @@ async function loadOutbox() {
   if (!rows.length) { box.textContent = t('empty'); return; }
   box.innerHTML = rows.map(o =>
     `<div style="border-top:1px solid var(--line);padding:8px 0">
-       <b>${o.subject}</b> → ${o.to_email} ${o.copied_at ? `<span class="muted">(${t('copied')})</span>` : `<button class="secondary" onclick="copyMail(${o.id}, this)">${t('copy')}</button>`}
+       <b>${o.subject}</b> → ${o.to_email} ${o.copied_at ? `<span class="muted">(${t('copied')})</span>` : `<button class="secondary" onclick="copyMail(${o.id}, this)">${t('copy')}</button>`} <a href="/api/outbox/${o.id}/print" target="_blank">${t('print')}</a>
        <pre id="mail-${o.id}" class="hidden">${o.body}</pre>
      </div>`).join('');
 }

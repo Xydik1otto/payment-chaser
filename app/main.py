@@ -707,6 +707,31 @@ def outbox(conn=Conn):
     return [dict(r) for r in rows]
 
 
+@app.get("/api/outbox/{outbox_id}/print")
+def outbox_print(outbox_id: int, conn=Conn):
+    """Print-friendly page for one outbox letter (browser print, no SMTP).
+    Nothing is sent, stored or marked — pure view + window.print()."""
+    row = conn.execute(
+        "SELECT o.*, i.number AS invoice_number FROM outbox o "
+        "LEFT JOIN invoices i ON i.id = o.invoice_id WHERE o.id = ?", (outbox_id,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Outbox entry not found")
+    import html as html_mod
+    to, subject, body = html_mod.escape(row["to_email"]), html_mod.escape(row["subject"]), html_mod.escape(row["body"])
+    return f"""<!DOCTYPE html><html lang="uk"><head><meta charset="utf-8">
+<title>Друк: {subject}</title>
+<style>body{{font-family:Georgia,'Times New Roman',serif;max-width:720px;margin:40px auto;padding:0 16px}}
+.meta{{color:#78716c;font-size:13px}}pre{{white-space:pre-wrap;font-family:inherit}}
+@media print {{.noprint{{display:none}}}}</style></head><body onload="window.print()">
+<p class="meta noprint">Друк листа з черги (outbox #{row["id"]}) · інвойс {html_mod.escape(row["invoice_number"] or "—")}
+· <b>не відправлено через SMTP</b></p>
+<p><b>To:</b> {to}<br><b>Subject:</b> {subject}</p>
+<pre>{body}</pre>
+<p class="noprint"><a href="javascript:window.print()">🖨 Друк</a> · <a href="/">← назад до дашборда</a></p>
+</body></html>"""
+
+
 @app.post("/api/outbox/{outbox_id}/mark-copied")
 def mark_copied(outbox_id: int, conn=Conn):
     cur = conn.execute("UPDATE outbox SET copied_at = ? WHERE id = ?", (db.now_iso(), outbox_id))
