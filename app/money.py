@@ -11,7 +11,7 @@ SYMBOLS = {
     "PLN": "zł",
 }
 
-LANGUAGES = ("uk", "en")
+LANGUAGES = ("uk", "en", "de")
 
 
 def _group(digits: str, sep: str) -> str:
@@ -37,6 +37,8 @@ def format_money(amount: float, currency: str, lang: str = "uk",
     int_part, dec_part = text.split(".")
     if lang == "uk":
         formatted = f"{_group(int_part, ' ')},{dec_part} {symbol}"
+    elif lang == "de":
+        formatted = f"{_group(int_part, '.')},{dec_part} {symbol}"
     else:
         formatted = f"{symbol}{_group(int_part, ',')}.{dec_part}"
     return f"-{formatted}" if negative else formatted

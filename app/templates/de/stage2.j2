@@ -1,0 +1,25 @@
+SUBJECT: Rechnung {{ invoice_number }} ist {{ days_overdue }} Tage überfällig
+{% if company_logo %}
+{{ company_logo }}
+{% endif %}
+Guten Tag {{ client_name }}!
+
+Die Rechnung {{ invoice_number }} über {{ fmt(amount, currency) }}
+ist nun {{ days_overdue }} Tage überfällig (Fälligkeit: {{ due_date }}).
+{% if items %}
+Rechnungspositionen:
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ fmt(it.price, currency) }} = {{ fmt(it.total, currency) }}
+{% endfor %}
+{% endif %}
+
+Bitte begleichen Sie die Rechnung zum nächstmöglichen Zeitpunkt oder melden Sie sich,
+falls Sie Fragen zur Rechnung haben.
+
+{% if payment_link %}
+Online bezahlen: {{ payment_link }}
+{% endif %}
+{% if company_iban %}
+Zahlungsdetails: {{ company_iban }}
+{% endif %}
+Mit freundlichen Grüßen
+{{ company_name }}

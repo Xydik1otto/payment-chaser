@@ -1,0 +1,24 @@
+SUBJECT: Freundliche Erinnerung: Rechnung {{ invoice_number }} über {{ fmt(amount, currency) }}
+{% if company_logo %}
+{{ company_logo }}
+{% endif %}
+Guten Tag {{ client_name }}!
+
+Wir erinnern freundlich daran, dass die Rechnung {{ invoice_number }} über {{ fmt(amount, currency) }}
+mit Fälligkeit am {{ due_date }} gestellt wurde.
+{% if items %}
+Rechnungspositionen:
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ fmt(it.price, currency) }} = {{ fmt(it.total, currency) }}
+{% endfor %}
+{% endif %}
+
+Falls die Rechnung bereits bezahlt wurde — bitte diese E-Mail ignorieren, danke!
+
+{% if payment_link %}
+Online bezahlen: {{ payment_link }}
+{% endif %}
+{% if company_iban %}
+Zahlungsdetails: {{ company_iban }}
+{% endif %}
+Mit freundlichen Grüßen
+{{ company_name }}

@@ -1,0 +1,27 @@
+SUBJECT: Letzte Mahnung: Rechnung {{ invoice_number }} — {{ days_overdue }} Tage überfällig
+{% if company_logo %}
+{{ company_logo }}
+{% endif %}
+Guten Tag {{ client_name }}!
+
+Die Rechnung {{ invoice_number }} über {{ fmt(amount, currency) }}
+ist seit {{ days_overdue }} Tagen unbezahlt (Fälligkeit: {{ due_date }}).
+{% if items %}
+Rechnungspositionen:
+{% for it in items %}- {{ it.item }} — {{ it.qty }} × {{ fmt(it.price, currency) }} = {{ fmt(it.total, currency) }}
+{% endfor %}
+{% endif %}
+Dies ist die letzte Mahnung, bevor die Angelegenheit an ein Inkassobüro übergeben wird.
+{% if late_fee_line %}
+{{ late_fee_line }}
+{% endif %}
+Bitte zahlen Sie innerhalb von 5 Tagen.
+
+{% if payment_link %}
+Online bezahlen: {{ payment_link }}
+{% endif %}
+{% if company_iban %}
+Zahlungsdetails: {{ company_iban }}
+{% endif %}
+Mit freundlichen Grüßen
+{{ company_name }}

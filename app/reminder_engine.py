@@ -25,7 +25,7 @@ STAGES = {
     3: {"day": 14, "name": "firm"},
     4: {"day": 30, "name": "final"},
 }
-LANGUAGES = ("uk", "en")
+LANGUAGES = ("uk", "en", "de")
 BUCKETS = [("1-7", 1, 7), ("8-14", 8, 14), ("15-30", 15, 30), ("30+", 31, 10**9)]
 
 _env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), autoescape=False, trim_blocks=True)

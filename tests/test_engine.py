@@ -190,8 +190,10 @@ def test_template_stage4_without_late_fee():
 def test_render_rejects_unknown_stage_and_language():
     with pytest.raises(ValueError):
         eng.render(5, "uk", _ctx())
+    # 'de' is supported since the de-templates feature; 'ru' is never added
+    # (owner's political decision) and must stay rejected.
     with pytest.raises(ValueError):
-        eng.render(1, "de", _ctx())
+        eng.render(1, "ru", _ctx())
 
 
 def test_letters_carry_correct_variables(client):
