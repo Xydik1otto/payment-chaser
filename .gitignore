@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 *.db
 .pytest_cache/
+.venv/
+venv/
+.env
+dist/
+build/

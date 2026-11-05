@@ -76,3 +76,20 @@ def init_db(db_path: str | None = None) -> None:
         DB_PATH = db_path
     with get_conn() as conn:
         conn.executescript(SCHEMA)
+        _migrate(conn)
+
+
+# Columns added after the initial release; guarded ALTERs keep old DB files working.
+_EXTRA_INVOICE_COLUMNS = {
+    "paid_at": "TEXT",                                # when PATCH status -> paid
+    "chaser_paused": "INTEGER NOT NULL DEFAULT 0",    # pause/stop chaser (v0.2.x)
+    "pause_reason": "TEXT",                           # why the chaser was paused
+}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add columns introduced in later versions to existing databases."""
+    existing = {r["name"] for r in conn.execute("PRAGMA table_info(invoices)")}
+    for col, ddl in _EXTRA_INVOICE_COLUMNS.items():
+        if col not in existing:
+            conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} {ddl}")

@@ -10,23 +10,34 @@ Routes:
   History  GET  /api/reminders
 """
 import os
+from contextlib import asynccontextmanager
 from datetime import date
 
 from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, HTMLResponse
 from pydantic import BaseModel
 
-from . import db, mailer, reminder_engine
+from . import db, mailer, pdf, reminder_engine, scheduler, stats
 from .reminder_engine import Letter
 
-app = FastAPI(title="Payment Chaser", version="0.1.0")
+DESCRIPTION = """API for chasing overdue invoice payments: reminder chain
+(day 1/7/14/30), outbox-first delivery, aging dashboard, effectiveness stats."""
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init_db()
+    thread = scheduler.start()  # no-op when DISABLE_SCHEDULER=1
+    try:
+        yield
+    finally:
+        pass  # daemon thread dies with the process; nothing to join
+
+
+app = FastAPI(title="Payment Chaser", version="0.1.0", lifespan=lifespan,
+              description=DESCRIPTION)
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-
-
-@app.on_event("startup")
-def startup() -> None:
-    db.init_db()
 
 
 def conn_dep():
@@ -124,10 +135,66 @@ class InvoicePatch(BaseModel):
 def patch_invoice(invoice_id: int, body: InvoicePatch, conn=Conn):
     if body.status not in ("draft", "sent", "overdue", "paid"):
         raise HTTPException(422, "status must be draft|sent|overdue|paid")
-    cur = conn.execute("UPDATE invoices SET status = ? WHERE id = ?", (body.status, invoice_id))
+    cur = conn.execute(
+        "UPDATE invoices SET status = ?, "
+        "paid_at = CASE WHEN ? = 'paid' THEN ? ELSE paid_at END "
+        "WHERE id = ?",
+        (body.status, body.status, db.now_iso(), invoice_id),
+    )
     if cur.rowcount == 0:
         raise HTTPException(404, "Invoice not found")
     return {"ok": True, "id": invoice_id, "status": body.status}
+
+
+# ---------------------------------------------------------------- PDF
+
+
+@app.get("/api/invoices/{invoice_id}/pdf")
+def invoice_pdf(invoice_id: int, conn=Conn):
+    row = conn.execute(
+        "SELECT i.*, c.name AS client_name, c.email AS client_email "
+        "FROM invoices i JOIN clients c ON c.id = i.client_id WHERE i.id = ?",
+        (invoice_id,),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Invoice not found")
+    data = pdf.render_pdf(dict(row), {"name": row["client_name"], "email": row["client_email"]})
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{row["number"]}.pdf"'},
+    )
+
+
+# ---------------------------------------------------------------- stats
+
+
+@app.get("/api/stats/effectiveness")
+def effectiveness(conn=Conn):
+    return stats.effectiveness(conn)
+
+
+@app.get("/stats", response_class=HTMLResponse)
+def effectiveness_page(conn=Conn):
+    """Server-rendered effectiveness page: letters per stage, payments after
+    each stage of the chain."""
+    e = stats.effectiveness(conn)
+    rows = "".join(
+        f"<tr><td>Stage {s}</td><td>{e['letters_per_stage'][s]}</td>"
+        f"<td>{e['paid_after_stage'][f'stage_{s}']}</td></tr>"
+        for s in ("1", "2", "3", "4")
+    )
+    return f"""<!DOCTYPE html><html lang="uk"><head><meta charset="utf-8">
+<title>Payment Chaser — effectiveness</title>
+<style>body{{font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px}}
+table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #ddd;padding:8px;text-align:left}}
+</style></head><body>
+<h1>Effectiveness</h1>
+<p>Всього листів: <b>{e['total_letters']}</b> · Оплачених рахунків: <b>{e['paid_total']}</b>
+· Оплата після ≥1 листа: <b>{e['conversion_after_letters']:.0%}</b></p>
+<table><tr><th>Стадія</th><th>Листів відправлено</th><th>Оплачено після</th></tr>{rows}
+<tr><td>Без жодного листа</td><td>—</td><td>{e['paid_after_stage']['no_letters']}</td></tr></table>
+<p><a href="/">← назад до дашборда</a></p></body></html>"""
 
 
 # ---------------------------------------------------------------- dashboard

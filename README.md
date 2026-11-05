@@ -1,19 +1,24 @@
 # Payment Chaser — вибивання прострочених оплат для фрілансерів
 
+![tests](https://github.com/bigpi/payment-chaser/actions/workflows/tests.yml/badge.svg)
+![license](https://img.shields.io/badge/license-MIT-green)
+![version](https://img.shields.io/badge/version-v0.1.0--alpha-orange)
+
+«Дебіторка, яка сама себе вибиває». Нагадування перестають бути особистою
+незручністю: система пише ввічливо і послідовно, ескалація — за розкладом,
+а не за настроєм.
+
 ## Проблема
 
 Фрілансери втомилися писати нагадування про прострочені рахунки вручну — і
-тому не пишуть їх узагалі. Ніша доведена: аналоги (Expired, Chaser-подібні
-сервіси) виходять на **$5–6K MRR з 200–300 клієнтів по $15–29/міс**.
-Дебторка — найболючіша рутина solo-бізнесу: рахунок оплачений, а гроші
-«десь йдуть», і нагадати про нього незручно.
+тому не пишуть їх узагалі. Дебторка — найболючіша рутина solo-бізнесу:
+рахунок оплачений, а гроші «десь йдуть», і нагадати про нього незручно.
 
-## Що робить MVP
+## Що вміє Alpha (v0.1.0-alpha)
 
-1. Ведете клієнтів та інвойси (number, client, amount, currency,
-   issued_date, due_date, status: draft / sent / overdue / paid).
-2. **Движок нагадувань** (кнопка «Запустити» або cron) знаходить прострочені
-   інвойси і генерує ланцюжок листів:
+1. **Клієнти та інвойси** (number, client, amount, currency, issued_date,
+   due_date, status: draft / sent / overdue / paid).
+2. **Движок нагадувань** — ланцюжок листів за розкладом:
 
    | Днів прострочення | Лист |
    |---|---|
@@ -22,17 +27,43 @@
    | 14 | firm (терміново) |
    | 30 | final notice + опція late fee |
 
-3. Листи — **українською та англійською** (Jinja2-шаблони, змінні: клієнт,
-   сума, номер, дні прострочення) — мова береться з профілю клієнта.
+3. Листи — **українською та англійською** (Jinja2-шаблони), мова береться
+   з профілю клієнта.
 4. **Відправка:** якщо задані env-змінні SMTP — листи йдуть автоматично;
-   інакше вони чекають в **outbox**-черзі з кнопкою **Copy** — ви вставляєте
-   текст у свою пошту самі. $0 витрат обов'язково.
+   інакше вони чекають в **outbox**-черзі з кнопкою **Copy**. $0 витрат.
 5. **Дашборд:** скільки прострочено, загальна сума, aging buckets
    (1–7, 8–14, 15–30, 30+ днів).
+6. **In-process scheduler** — фоновий потік сам запускає движок раз на
+   `CHASER_SCHEDULER_SECONDS` (за замовчуванням 3600); вимикається
+   `DISABLE_SCHEDULER=1` (тоді — cron, див. нижче).
+7. **PDF-інвойси** — `GET /api/invoices/{id}/pdf` (reportlab): реквізити
+   продавця, клієнт, позиції, сума.
+8. **Effectiveness-статистика** — сторінка `/stats` і
+   `GET /api/stats/effectiveness`: скільки листів на кожну стадію,
+   скільки оплат сталося після stage 1/2/3/4.
+
+## Як це працює
+
+```
+інвойси (SQLite)
+     │
+     ▼
+[движок нагадувань] ──◀ кнопка «Запустити» / cron / in-process scheduler
+     │   день 1 → ввічливий, день 7 → reminder, день 14 → firm, день 30 → final
+     ▼
+SMTP налаштований? ──так──▶ лист іде клієнту
+     │ ні
+     ▼
+outbox-черга ──▶ кнопка Copy ──▶ ви відправляєте зі своєї пошти
+     │
+     ▼
+клієнт заплатив → тиснете «Оплачено» → рухаємось до наступного рахунку
+```
 
 ## Швидкий старт
 
 ```bash
+git clone https://github.com/bigpi/payment-chaser.git
 cd payment-chaser
 python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --reload    # http://127.0.0.1:8000
@@ -49,11 +80,13 @@ python -m pytest tests/ -v
 ```bash
 export SMTP_HOST=smtp.gmail.com SMTP_PORT=587 SMTP_FROM=you@gmail.com
 export SMTP_USER=you@gmail.com SMTP_PASS="пароль додатку (App Password)"
-export CHASER_COMPANY_NAME="ФОП Ваше Ім'я"     # підпис у листах
+export CHASER_COMPANY_NAME="ФОП Ваше Ім'я"     # підпис у листах + шапка PDF
 export CHASER_LATE_FEE_PERCENT=5               # рядок late fee у final notice
+export CHASER_SCHEDULER_SECONDS=3600           # інтервал in-process scheduler
+# DISABLE_SCHEDULER=1                          # вимкнути scheduler (тоді cron)
 ```
 
-Cron (щодня о 09:00):
+Cron (щодня о 09:00) — якщо scheduler вимкнено:
 
 ```
 0 9 * * * curl -s -X POST http://127.0.0.1:8000/api/engine/run
@@ -61,5 +94,9 @@ Cron (щодня о 09:00):
 
 ## Стек
 
-Python 3.10+, FastAPI, SQLite (stdlib, без ORM), Jinja2,
+Python 3.10+, FastAPI, SQLite (stdlib, без ORM), Jinja2, reportlab,
 HTML + vanilla JS без build-кроку.
+
+## Ліцензія
+
+MIT — див. [LICENSE](LICENSE).
