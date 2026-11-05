@@ -69,6 +69,18 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS recurring_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL REFERENCES clients(id),
+    base_number TEXT NOT NULL,
+    amount REAL NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'UAH',
+    day_of_month INTEGER NOT NULL CHECK (day_of_month BETWEEN 1 AND 31),
+    active INTEGER NOT NULL DEFAULT 1,
+    last_created_month TEXT,             -- 'YYYY-MM' of the last auto-created invoice
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_reminders_invoice ON reminders(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 """

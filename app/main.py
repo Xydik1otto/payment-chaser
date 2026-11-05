@@ -7,6 +7,8 @@ Routes:
   Engine   POST /api/engine/run               — fire all letters due today
   Stats    GET  /api/dashboard                — overdue count, totals, aging buckets
   Outbox   GET  /api/outbox, POST /api/outbox/{id}/mark-copied
+  Recurring POST /api/recurring, GET /api/recurring, PATCH /api/recurring/{id},
+             POST /api/recurring/run — monthly auto-invoices
   History  GET  /api/reminders
 """
 import os
@@ -17,7 +19,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response, HTMLResponse
 from pydantic import BaseModel
 
-from . import db, demo, exporter, mailer, pdf, reminder_engine, scheduler, stats, summary, fx, report
+from . import db, demo, exporter, mailer, pdf, recurring, reminder_engine, scheduler, stats, summary, fx, report
 from .reminder_engine import Letter
 
 DESCRIPTION = """API for chasing overdue invoice payments: reminder chain
@@ -514,6 +516,68 @@ def base_currency_report(base: str | None = None, refresh: bool = False, conn=Co
     if refresh:
         eff = fx.load_rates(conn, force_refresh=True)
     return report.build_report(conn, date.today(), base=base)
+
+
+# ---------------------------------------------------------------- recurring
+
+
+class RecurringIn(BaseModel):
+    client_id: int
+    base_number: str
+    amount: float
+    currency: str = "UAH"
+    day_of_month: int  # 1..31 (29-31 clamp to the month's last day)
+
+
+@app.post("/api/recurring")
+def create_recurring(body: RecurringIn, conn=Conn):
+    try:
+        profile_id = recurring.create_profile(
+            conn, body.client_id, body.base_number, body.amount,
+            body.currency, body.day_of_month)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    except LookupError as exc:
+        raise HTTPException(404, str(exc))
+    return {"id": profile_id, **body.model_dump(), "active": True}
+
+
+@app.get("/api/recurring")
+def list_recurring(conn=Conn):
+    rows = conn.execute(
+        "SELECT r.*, c.name AS client_name FROM recurring_profiles r "
+        "JOIN clients c ON c.id = r.client_id ORDER BY r.id"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+class RecurringPatch(BaseModel):
+    active: bool
+
+
+@app.patch("/api/recurring/{profile_id}")
+def patch_recurring(profile_id: int, body: RecurringPatch, conn=Conn):
+    cur = conn.execute(
+        "UPDATE recurring_profiles SET active = ? WHERE id = ?",
+        (1 if body.active else 0, profile_id),
+    )
+    if cur.rowcount == 0:
+        raise HTTPException(404, "Recurring profile not found")
+    return {"ok": True, "id": profile_id, "active": body.active}
+
+
+class RecurringRunIn(BaseModel):
+    today: str | None = None  # ISO date override (backfill/testing)
+
+
+@app.post("/api/recurring/run")
+def recurring_run(body: RecurringRunIn | None = None, conn=Conn):
+    """Create this month's invoices for every due recurring profile.
+    Idempotent: re-running the same month creates nothing new."""
+    today = date.fromisoformat(body.today) if body and body.today else date.today()
+    created = recurring.create_due(conn, today)
+    return {"run_date": today.isoformat(), "created": created,
+            "created_count": len(created)}
 
 
 # ---------------------------------------------------------------- engine
